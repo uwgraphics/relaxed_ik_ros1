@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>relaxed_ik_core</name>
+  <name>relaxed_ik_ros1</name>
   <version>0.0.0</version>
-  <description>The relaxed_ik_core package</description>
+  <description>The relaxed_ik_ros1 package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
@@ -19,7 +19,7 @@
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/relaxed_ik_core</url> -->
+  <!-- <url type="website">http://wiki.ros.org/relaxed_ik_ros1</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->
@@ -49,6 +49,7 @@
   <!-- Use doc_depend for packages you need only for building documentation: -->
   <!--   <doc_depend>doxygen</doc_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
+
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

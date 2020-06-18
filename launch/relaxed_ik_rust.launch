@@ -3,6 +3,6 @@
 
    <!-- ##################################################################################### -->
 
-   <node pkg="relaxed_ik_core" type="relaxed_ik_rust.py" name="relaxed_ik_node" output="screen"/>
+   <node pkg="relaxed_ik_ros1" type="relaxed_ik_rust.py" name="relaxed_ik_node" output="screen"/>
 
 </launch>

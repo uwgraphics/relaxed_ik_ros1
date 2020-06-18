@@ -1,7 +1,7 @@
-relaxed_ik/EEPoseGoals ee_pose_goals
-relaxed_ik/JointAngles init
+relaxed_ik_ros1/EEPoseGoals ee_pose_goals
+relaxed_ik_ros1/JointAngles init
 float64 ee_pos_precision
 float64 ee_rot_precision
 ---
-relaxed_ik/JointAngles joint_angles
+relaxed_ik_ros1/JointAngles joint_angles
 bool success

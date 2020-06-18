@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(relaxed_ik_core)
+project(relaxed_ik_ros1)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -48,6 +48,11 @@ find_package(catkin REQUIRED COMPONENTS std_msgs message_generation geometry_msg
 #   Message1.msg
 #   Message2.msg
 # )
+add_message_files(
+   FILES
+   EEPoseGoals.msg
+   JointAngles.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -55,6 +60,12 @@ find_package(catkin REQUIRED COMPONENTS std_msgs message_generation geometry_msg
 #   Service1.srv
 #   Service2.srv
 # )
+add_service_files(
+   FILES
+   RelaxedIKSolution.srv
+   IKSolution.srv
+   SelfCollisionQuery.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -68,6 +79,11 @@ find_package(catkin REQUIRED COMPONENTS std_msgs message_generation geometry_msg
 #   DEPENDENCIES
 #   std_msgs  # Or other packages containing msgs
 # )
+generate_messages(
+   DEPENDENCIES
+   geometry_msgs  # Or other packages containing msgs
+   std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -100,8 +116,8 @@ find_package(catkin REQUIRED COMPONENTS std_msgs message_generation geometry_msg
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES relaxed_ik_core
-#  CATKIN_DEPENDS rosrust
+#  LIBRARIES relaxed_ik_ros1
+#  CATKIN_DEPENDS other_catkin_pkg
 #  DEPENDS system_lib
 )
 
@@ -113,12 +129,12 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
 # include
-  ${catkin_INCLUDE_DIRS}
+# ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/relaxed_ik_core.cpp
+#   src/${PROJECT_NAME}/relaxed_ik_ros1.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -129,7 +145,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/relaxed_ik_core_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/relaxed_ik_ros1_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -193,7 +209,7 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_relaxed_ik_core.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_relaxed_ik_ros1.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
