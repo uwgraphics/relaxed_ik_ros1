@@ -12,8 +12,5 @@ roslaunch relaxed_ik_ros1 relaxed_ik_rust.launch
 
 3. Test by opening a new terminal and publishing a new message to the topic EE pose goals:
 ```
-rostopic pub -1 /relaxed_ik/ee_pose_goals relaxed_ik/EEPoseGoals '[0, now, base_link]' '[{position: [0.015, 0.015, 0.015], orientation: [0.0, 0.0, 0.0, 1.0]}]'
+rostopic pub -1 /relaxed_ik/ee_pose_goals relaxed_ik_ros1/EEPoseGoals '[0, now, base_link]' '[{position: [0.015, 0.015, 0.015], orientation: [0.0, 0.0, 0.0, 1.0]}]'
 ```
-
-## Known issues
-1. This wrapper is pointing to a different commit from the ROS2 and Unity wrappers because of a different Cargo.toml.
