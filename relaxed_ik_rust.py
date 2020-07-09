@@ -47,10 +47,10 @@ def main(args=None):
             pos_arr[3*i+1] = p.position.y
             pos_arr[3*i+2] = p.position.z
 
-            quat_arr[3*i] = p.orientation.w
-            quat_arr[3*i+1] = p.orientation.x
-            quat_arr[3*i+2] = p.orientation.y
-            quat_arr[3*i+3] = p.orientation.z
+            quat_arr[4*i] = p.orientation.w
+            quat_arr[4*i+1] = p.orientation.x
+            quat_arr[4*i+2] = p.orientation.y
+            quat_arr[4*i+3] = p.orientation.z
 
         xopt = lib.run_ros1(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
 
