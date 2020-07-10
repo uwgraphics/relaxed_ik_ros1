@@ -4,7 +4,7 @@ import readchar
 import rospy
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, QuaternionStamped, Pose
 from std_msgs.msg import Bool
-from relaxed_ik.msg import EEPoseGoals
+from relaxed_ik_ros1.msg import EEPoseGoals
 import transformations as T
 
 rospy.init_node('keyboard_ikgoal_driver')

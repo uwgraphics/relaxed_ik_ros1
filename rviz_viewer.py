@@ -17,7 +17,7 @@ import tf
 import os
 # from RelaxedIK.Utils.yaml_utils import get_relaxedIK_yaml_obj
 from sensor_msgs.msg import JointState
-from relaxed_ik.msg import JointAngles
+from relaxed_ik_ros1.msg import JointAngles
 # import relaxed_ik
 # help(relaxed_ik)
 
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
     info_file = open(info_file_path, 'r')
 
-    print(info_file_path)
+    # print(info_file_path)
 
     y = yaml.load(info_file)
     # if not y == None:
