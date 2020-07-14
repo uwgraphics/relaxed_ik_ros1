@@ -3,9 +3,7 @@
 This is a cleaner version of Relaxed IK wrapped up in ROS1 with pre-generated config files of some mostly used pre-computed robot arms. For the complete version, please follow this link: https://github.com/uwgraphics/relaxed_ik
 
 ## Dependencies
-
 ### Python Dependencies (Not optional)
-
 kdl urdf parser:
 ```
 sudo apt-get install ros-[your ros distro]-urdfdom-py
@@ -46,7 +44,6 @@ sudo pip install --upgrade numpy
 ```
 
 ### Rust Dependencies (Not optional)
-
 To use the Rust version of the solver (the recommended option), you will first need to install Rust.
 https://www.rust-lang.org/learn/get-started
 
@@ -54,7 +51,11 @@ If you plan to extend any of the Rust code, we recommend using the Jetbrains rus
 
 ## Install
 1. Install all the dependencies.
-2. Clone this repo to the src directory in your ROS workspace and build your workspace.
+2. Clone this repo to the src directory in your ROS workspace.
+3. Initialize relaxed_ik_core (The core part of relaxed IK written in Rust) as a submodule by running the following command at the project directory: 
+	```
+	git submodule update --init
+	```
 
 ## Run
 1. Configure the name of the pre-computed robot arm you would like to run with (available options are ur5, yumi, panda and iiwa7) in relaxed_ik_core/config/loaded_robot.
@@ -65,12 +66,13 @@ If you plan to extend any of the Rust code, we recommend using the Jetbrains rus
 	cargo build
     ```
 
-2. Run the following command: 
+3. Build your ROS workspace.
+2. Run the following command to launch the solver: 
     ```
     roslaunch relaxed_ik_ros1 relaxed_ik_rust.launch
     ```
 
-3. (Optional) Open a new terminal and run the following command to publish a new message to the topic EE pose goals to get the joint angle solutions:
+3. (Optional) Open a new terminal and run the following command to publish a new message to the topic EE pose goals to get the joint angle solutions (change the letter placeholders to actual numbers):
     ```
     rostopic pub -1 /relaxed_ik/ee_pose_goals relaxed_ik_ros1/EEPoseGoals '[0, now, base_link]' '[{position: [x, y, z], orientation: [x, y, z, w]}]'
     ```
@@ -80,12 +82,12 @@ If you plan to extend any of the Rust code, we recommend using the Jetbrains rus
     roslaunch relaxed_ik_ros1 rviz_viewer.launch
     ```
 
-5. Initialize the keyboard IK goal driver node to move the robot arm in rviz:
+5. In a new terminal, initialize the keyboard IK goal driver node to move the robot arm in rviz:
     ```
     rosrun relaxed_ik_ros1 keyboard_ikgoal_driver.py
     ```
 
-6. Use these keyboard controls to move the robot arm:
+6. To use the keyboard controller, please ensure that the termainal window where the keyboard_ikgoal_driver script was run from has focus (i.e., make sure it's clicked), then use the following keystrokes: 
     * c - kill the controller controller script
 	* w - move chain 1 along +X
 	* x - move chain 1 along -X
