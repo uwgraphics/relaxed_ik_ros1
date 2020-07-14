@@ -14,7 +14,7 @@ rospack = rospkg.RosPack()
 p = rospack.get_path('relaxed_ik_ros1')
 os.chdir(p + "/relaxed_ik_core")
 
-lib = ctypes.cdll.LoadLibrary(p + '/relaxed_ik_core/target/debug/librelaxed_ik.so')
+lib = ctypes.cdll.LoadLibrary(p + '/relaxed_ik_core/target/debug/librelaxed_ik_lib.so')
 lib.run_ros1.restype = Opt
 
 eepg = None

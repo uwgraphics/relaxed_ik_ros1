@@ -9,17 +9,13 @@ PLEASE DO NOT CHANGE CODE IN THIS FILE.  IF TRYING TO SET UP RELAXEDIK, PLEASE R
 AND FOLLOW THE STEP-BY-STEP INSTRUCTIONS THERE.  Thanks!
 '''
 
-# from start_here import urdf_file_name, fixed_frame, joint_ordering, starting_config, joint_state_define
 import rospy
 import yaml
 import roslaunch
 import tf
 import os
-# from RelaxedIK.Utils.yaml_utils import get_relaxedIK_yaml_obj
 from sensor_msgs.msg import JointState
 from relaxed_ik_ros1.msg import JointAngles
-# import relaxed_ik
-# help(relaxed_ik)
 
 ja_solution = ''
 def ja_solution_cb(data):
@@ -40,7 +36,6 @@ if __name__ == '__main__':
     # print(info_file_path)
 
     y = yaml.load(info_file)
-    # if not y == None:
     urdf_file_name = y['urdf_file_name']
     fixed_frame = y['fixed_frame']
     joint_ordering = y['joint_ordering']
