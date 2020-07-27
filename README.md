@@ -44,7 +44,7 @@ sudo pip install --upgrade numpy
 ```
 
 ### Rust Dependencies (Not optional)
-To use the Rust version of the solver (the recommended option), you will first need to install Rust.
+To use this wrapper, you will first need to install Rust.
 https://www.rust-lang.org/learn/get-started
 
 If you plan to extend any of the Rust code, we recommend using the Jetbrains rust plugin.
@@ -52,7 +52,7 @@ If you plan to extend any of the Rust code, we recommend using the Jetbrains rus
 ## Install
 1. Install all the dependencies.
 2. Clone this repo to the src directory in your ROS workspace.
-3. Initialize relaxed_ik_core (The core part of relaxed IK written in Rust) as a submodule by running the following command at the project directory: 
+3. Initialize relaxed_ik_core (The core part of relaxed IK written in Rust) as a submodule by running the following command in the project directory: 
 	```
 	git submodule update --init
 	```
