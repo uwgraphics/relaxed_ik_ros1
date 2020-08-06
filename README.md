@@ -53,7 +53,7 @@ If you plan to extend any of the Rust code, we recommend using the Jetbrains rus
 ## Install
 1. Install all the dependencies.
 2. Clone this repo to the src directory in your ROS workspace.
-3. Initialize relaxed_ik_core (The core part of relaxed IK written in Rust) as a submodule by running the following command in the project directory: 
+3. Initialize relaxed_ik_core (the core part of relaxed IK written in Rust) as a submodule by running the following command in the project directory: 
 	```
 	git submodule update --init
 	```
@@ -63,7 +63,7 @@ If you plan to extend any of the Rust code, we recommend using the Jetbrains rus
 
 1. Configure the name of the pre-computed robot arm you would like to run with (available options are baxter, hubo, iiwa7, jaco7, panda, sawyer, ur5 and yumi) in relaxed_ik_core/config/loaded_robot.
 
-1. Compile relaxed_ik_core (The core part of relaxed IK written in Rust) by running the following command from the project directory:
+1. Compile relaxed_ik_core (the core part of relaxed IK written in Rust) by running the following command from the project directory:
 	```
     cd ./relaxed_ik_core
 	cargo build
@@ -75,7 +75,7 @@ If you plan to extend any of the Rust code, we recommend using the Jetbrains rus
     roslaunch relaxed_ik_ros1 relaxed_ik_rust.launch
     ```
 
-1. (Optional) Open a new terminal and run the following command to publish a new message to the topic EE pose goals to get the joint angle solutions (change the letter placeholders to actual numbers):
+1. You can publish a new message to the topic EE pose goals to get the joint angle solutions by opening a new terminal and running the following command (replace the letter placeholders with actual numbers):
     ```
     rostopic pub -1 /relaxed_ik/ee_pose_goals relaxed_ik_ros1/EEPoseGoals '[0, now, base_link]' '[{position: [x, y, z], orientation: [x, y, z, w]}]'
     ```

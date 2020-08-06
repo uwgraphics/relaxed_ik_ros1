@@ -15,7 +15,7 @@ p = rospack.get_path('relaxed_ik_ros1')
 os.chdir(p + "/relaxed_ik_core")
 
 lib = ctypes.cdll.LoadLibrary(p + '/relaxed_ik_core/target/debug/librelaxed_ik_lib.so')
-lib.run_ros1.restype = Opt
+lib.solve.restype = Opt
 
 eepg = None
 def eePoseGoals_cb(msg):
@@ -25,7 +25,7 @@ def eePoseGoals_cb(msg):
 def main(args=None):
     global eepg
 
-    print("\nSolver initialized!\n")
+    print("\nSolver initialized!")
 
     rospy.init_node('relaxed_ik')
     rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, eePoseGoals_cb)
@@ -52,14 +52,21 @@ def main(args=None):
             quat_arr[4*i+2] = p.orientation.y
             quat_arr[4*i+3] = p.orientation.z
 
-        xopt = lib.run_ros1(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
+        xopt = lib.solve(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
 
         ja = JointAngles()
         ja.header = header
+        ja_str = "["
         for i in range(xopt.length):
             ja.angles.data.append(xopt.data[i])
+            ja_str += str(xopt.data[i])
+            if i == xopt.length - 1:
+                ja_str += "]"
+            else: 
+                ja_str += ", "
 
         angles_pub.publish(ja)
+        print(ja_str)
 
         rate.sleep()
 
