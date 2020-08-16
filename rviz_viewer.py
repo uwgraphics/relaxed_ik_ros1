@@ -17,12 +17,21 @@ import os
 from sensor_msgs.msg import JointState
 from relaxed_ik_ros1.msg import JointAngles
 
+import os.path
+import transformations as T
+from interactive_markers.interactive_marker_server import *
+from visualization_msgs.msg import *
+
 ja_solution = ''
 def ja_solution_cb(data):
     global ja_solution
     ja_solution = []
     for a in data.angles.data:
         ja_solution.append(a)
+
+def processFeedback(feedback):
+    p = feedback.pose.position
+    print (feedback.marker_name + " is now at " + str(p.x) + ", " + str(p.y) + ", " + str(p.z))
 
 if __name__ == '__main__':
     rospy.init_node('rviz_viewer')
@@ -32,8 +41,6 @@ if __name__ == '__main__':
     info_file_name = open(path_to_src + '/relaxed_ik_core/config/loaded_robot', 'r').read()
     info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
     info_file = open(info_file_path, 'r')
-
-    # print(info_file_path)
 
     y = yaml.load(info_file)
     urdf_file_name = y['urdf_file_name']
@@ -59,6 +66,87 @@ if __name__ == '__main__':
     launch_path = path_to_src + '/launch/joint_state_pub_nojsp.launch'
     launch = roslaunch.parent.ROSLaunchParent(uuid, [launch_path])
     launch.start()
+
+    env_collision_file_path = path_to_src + '/relaxed_ik_core/config/env_collision_files/' + y['env_collision_file_name']
+    
+    if os.path.exists(env_collision_file_path):
+        env_collision_file = open(env_collision_file_path, 'r')
+        env_collision = yaml.load(env_collision_file)
+
+        planes = env_collision['boxes']
+        spheres = env_collision['spheres']
+
+        # create an interactive marker server on the topic namespace simple_marker
+        server = InteractiveMarkerServer("simple_marker")
+
+        # create an interactive marker for our server
+        int_marker = InteractiveMarker()
+        int_marker.header.frame_id = fixed_frame
+        int_marker.name = "my_marker"
+        
+        if planes is not None and len(planes) > 0: 
+            for p in planes:
+                ts = p['translation']
+                rots = p['rotation']
+                dim = p['parameters']
+                plane_marker = Marker()
+                plane_marker.type = Marker.CUBE
+                plane_marker.pose.position.x = ts[0]
+                plane_marker.pose.position.y = ts[1]
+                plane_marker.pose.position.z = ts[2]
+
+                quat = T.quaternion_from_euler(rots[0], rots[1], rots[2])
+                plane_marker.pose.orientation.x = quat[1]
+                plane_marker.pose.orientation.y = quat[2]
+                plane_marker.pose.orientation.z = quat[3]
+                plane_marker.pose.orientation.w = quat[0]
+
+                plane_marker.scale.x = dim[0] * 2
+                plane_marker.scale.y = dim[1] * 2
+                plane_marker.scale.z = dim[2] * 2
+                plane_marker.color.r = 0.0
+                plane_marker.color.g = 0.5
+                plane_marker.color.b = 0.5
+                plane_marker.color.a = 1.0
+
+                plane_control = InteractiveMarkerControl()
+                plane_control.always_visible = True
+                plane_control.markers.append(plane_marker)
+
+                int_marker.controls.append(plane_control)
+            
+            server.insert(int_marker, processFeedback)
+            server.applyChanges()
+
+        if spheres is not None and len(spheres) > 0: 
+            for s in spheres:
+                ts = s['translation']
+                radius = s['parameters']
+                sphere_marker = Marker()
+                sphere_marker.type = Marker.SPHERE
+                sphere_marker.pose.position.x = ts[0]
+                sphere_marker.pose.position.y = ts[1]
+                sphere_marker.pose.position.z = ts[2]
+                sphere_marker.pose.orientation.x = 0.0
+                sphere_marker.pose.orientation.y = 0.0
+                sphere_marker.pose.orientation.z = 0.0
+                sphere_marker.pose.orientation.w = 1.0
+                sphere_marker.scale.x = radius * 2
+                sphere_marker.scale.y = radius * 2
+                sphere_marker.scale.z = radius * 2
+                sphere_marker.color.r = 0.0
+                sphere_marker.color.g = 0.5
+                sphere_marker.color.b = 0.5
+                sphere_marker.color.a = 1.0
+
+                sphere_control = InteractiveMarkerControl()
+                sphere_control.always_visible = True
+                sphere_control.markers.append(sphere_marker)
+
+                int_marker.controls.append(sphere_control)
+
+            server.insert(int_marker, processFeedback)
+            server.applyChanges()
 
     prev_state = []
 
