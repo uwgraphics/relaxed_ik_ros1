@@ -50,6 +50,8 @@ while not rospy.is_shutdown():
     pose.pose.orientation.z = rotation_l[3]
     ik_goal_l_pub.publish(pose)
 
+    print("Pos R: {}, Pos L: {}".format(position_r, position_l))
+
     key = readchar.readkey()
     if key == 'w':
         position_r[0] += pos_stride
