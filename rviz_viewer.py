@@ -67,86 +67,87 @@ if __name__ == '__main__':
     launch = roslaunch.parent.ROSLaunchParent(uuid, [launch_path])
     launch.start()
 
-    env_collision_file_path = path_to_src + '/relaxed_ik_core/config/env_collision_files/' + y['env_collision_file_name']
-    
-    if os.path.exists(env_collision_file_path):
-        env_collision_file = open(env_collision_file_path, 'r')
-        env_collision = yaml.load(env_collision_file)
-
-        planes = env_collision['boxes']
-        spheres = env_collision['spheres']
-
-        # create an interactive marker server on the topic namespace simple_marker
-        server = InteractiveMarkerServer("simple_marker")
-
-        # create an interactive marker for our server
-        int_marker = InteractiveMarker()
-        int_marker.header.frame_id = fixed_frame
-        int_marker.name = "my_marker"
+    if 'env_collision_file_name' in y: 
+        env_collision_file_path = path_to_src + '/relaxed_ik_core/config/env_collision_files/' + y['env_collision_file_name']
         
-        if planes is not None and len(planes) > 0: 
-            for p in planes:
-                ts = p['translation']
-                rots = p['rotation']
-                dim = p['parameters']
-                plane_marker = Marker()
-                plane_marker.type = Marker.CUBE
-                plane_marker.pose.position.x = ts[0]
-                plane_marker.pose.position.y = ts[1]
-                plane_marker.pose.position.z = ts[2]
+        if os.path.exists(env_collision_file_path):
+            env_collision_file = open(env_collision_file_path, 'r')
+            env_collision = yaml.load(env_collision_file)
 
-                quat = T.quaternion_from_euler(rots[0], rots[1], rots[2])
-                plane_marker.pose.orientation.x = quat[1]
-                plane_marker.pose.orientation.y = quat[2]
-                plane_marker.pose.orientation.z = quat[3]
-                plane_marker.pose.orientation.w = quat[0]
+            planes = env_collision['boxes']
+            spheres = env_collision['spheres']
 
-                plane_marker.scale.x = dim[0] * 2
-                plane_marker.scale.y = dim[1] * 2
-                plane_marker.scale.z = dim[2] * 2
-                plane_marker.color.r = 0.0
-                plane_marker.color.g = 0.5
-                plane_marker.color.b = 0.5
-                plane_marker.color.a = 1.0
+            # create an interactive marker server on the topic namespace simple_marker
+            server = InteractiveMarkerServer("simple_marker")
 
-                plane_control = InteractiveMarkerControl()
-                plane_control.always_visible = True
-                plane_control.markers.append(plane_marker)
-
-                int_marker.controls.append(plane_control)
+            # create an interactive marker for our server
+            int_marker = InteractiveMarker()
+            int_marker.header.frame_id = fixed_frame
+            int_marker.name = "my_marker"
             
-            server.insert(int_marker, processFeedback)
-            server.applyChanges()
+            if planes is not None and len(planes) > 0: 
+                for p in planes:
+                    ts = p['translation']
+                    rots = p['rotation']
+                    dim = p['parameters']
+                    plane_marker = Marker()
+                    plane_marker.type = Marker.CUBE
+                    plane_marker.pose.position.x = ts[0]
+                    plane_marker.pose.position.y = ts[1]
+                    plane_marker.pose.position.z = ts[2]
 
-        if spheres is not None and len(spheres) > 0: 
-            for s in spheres:
-                ts = s['translation']
-                radius = s['parameters']
-                sphere_marker = Marker()
-                sphere_marker.type = Marker.SPHERE
-                sphere_marker.pose.position.x = ts[0]
-                sphere_marker.pose.position.y = ts[1]
-                sphere_marker.pose.position.z = ts[2]
-                sphere_marker.pose.orientation.x = 0.0
-                sphere_marker.pose.orientation.y = 0.0
-                sphere_marker.pose.orientation.z = 0.0
-                sphere_marker.pose.orientation.w = 1.0
-                sphere_marker.scale.x = radius * 2
-                sphere_marker.scale.y = radius * 2
-                sphere_marker.scale.z = radius * 2
-                sphere_marker.color.r = 0.0
-                sphere_marker.color.g = 0.5
-                sphere_marker.color.b = 0.5
-                sphere_marker.color.a = 1.0
+                    quat = T.quaternion_from_euler(rots[0], rots[1], rots[2])
+                    plane_marker.pose.orientation.x = quat[1]
+                    plane_marker.pose.orientation.y = quat[2]
+                    plane_marker.pose.orientation.z = quat[3]
+                    plane_marker.pose.orientation.w = quat[0]
 
-                sphere_control = InteractiveMarkerControl()
-                sphere_control.always_visible = True
-                sphere_control.markers.append(sphere_marker)
+                    plane_marker.scale.x = dim[0] * 2
+                    plane_marker.scale.y = dim[1] * 2
+                    plane_marker.scale.z = dim[2] * 2
+                    plane_marker.color.r = 0.0
+                    plane_marker.color.g = 0.5
+                    plane_marker.color.b = 0.5
+                    plane_marker.color.a = 1.0
 
-                int_marker.controls.append(sphere_control)
+                    plane_control = InteractiveMarkerControl()
+                    plane_control.always_visible = True
+                    plane_control.markers.append(plane_marker)
 
-            server.insert(int_marker, processFeedback)
-            server.applyChanges()
+                    int_marker.controls.append(plane_control)
+                
+                server.insert(int_marker, processFeedback)
+                server.applyChanges()
+
+            if spheres is not None and len(spheres) > 0: 
+                for s in spheres:
+                    ts = s['translation']
+                    radius = s['parameters']
+                    sphere_marker = Marker()
+                    sphere_marker.type = Marker.SPHERE
+                    sphere_marker.pose.position.x = ts[0]
+                    sphere_marker.pose.position.y = ts[1]
+                    sphere_marker.pose.position.z = ts[2]
+                    sphere_marker.pose.orientation.x = 0.0
+                    sphere_marker.pose.orientation.y = 0.0
+                    sphere_marker.pose.orientation.z = 0.0
+                    sphere_marker.pose.orientation.w = 1.0
+                    sphere_marker.scale.x = radius * 2
+                    sphere_marker.scale.y = radius * 2
+                    sphere_marker.scale.z = radius * 2
+                    sphere_marker.color.r = 0.0
+                    sphere_marker.color.g = 0.5
+                    sphere_marker.color.b = 0.5
+                    sphere_marker.color.a = 1.0
+
+                    sphere_control = InteractiveMarkerControl()
+                    sphere_control.always_visible = True
+                    sphere_control.markers.append(sphere_marker)
+
+                    int_marker.controls.append(sphere_control)
+
+                server.insert(int_marker, processFeedback)
+                server.applyChanges()
 
     prev_state = []
 
