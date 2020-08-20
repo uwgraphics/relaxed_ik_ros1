@@ -74,9 +74,6 @@ if __name__ == '__main__':
             env_collision_file = open(env_collision_file_path, 'r')
             env_collision = yaml.load(env_collision_file)
 
-            planes = env_collision['boxes']
-            spheres = env_collision['spheres']
-
             # create an interactive marker server on the topic namespace simple_marker
             server = InteractiveMarkerServer("simple_marker")
 
@@ -85,7 +82,8 @@ if __name__ == '__main__':
             int_marker.header.frame_id = fixed_frame
             int_marker.name = "my_marker"
             
-            if planes is not None and len(planes) > 0: 
+            if 'boxes' in env_collision: 
+                planes = env_collision['boxes']
                 for p in planes:
                     ts = p['translation']
                     rots = p['rotation']
@@ -119,7 +117,8 @@ if __name__ == '__main__':
                 server.insert(int_marker, processFeedback)
                 server.applyChanges()
 
-            if spheres is not None and len(spheres) > 0: 
+            if 'spheres' in env_collision:
+                spheres = env_collision['spheres']
                 for s in spheres:
                     ts = s['translation']
                     radius = s['parameters']
@@ -145,6 +144,38 @@ if __name__ == '__main__':
                     sphere_control.markers.append(sphere_marker)
 
                     int_marker.controls.append(sphere_control)
+
+                server.insert(int_marker, processFeedback)
+                server.applyChanges()
+
+            if 'sphere_lists' in env_collision: 
+                sphere_lists = env_collision['sphere_lists']
+                for l in sphere_lists:
+                    ts = l['translation']
+                    radius = l['parameters']
+                    points = l['points']
+                    for pt in points:
+                        sphere_list_marker = Marker()
+                        sphere_list_marker.type = Marker.SPHERE
+                        sphere_list_marker.pose.position.x = ts[0] + pt[0]
+                        sphere_list_marker.pose.position.y = ts[1] + pt[1]
+                        sphere_list_marker.pose.position.z = ts[2] + pt[2]
+                        sphere_list_marker.pose.orientation.x = 0.0
+                        sphere_list_marker.pose.orientation.y = 0.0
+                        sphere_list_marker.pose.orientation.z = 0.0
+                        sphere_list_marker.pose.orientation.w = 1.0
+                        sphere_list_marker.scale.x = radius * 2
+                        sphere_list_marker.scale.y = radius * 2
+                        sphere_list_marker.scale.z = radius * 2
+                        sphere_list_marker.color.r = 0.5
+                        sphere_list_marker.color.g = 0.0
+                        sphere_list_marker.color.b = 0.5
+                        sphere_list_marker.color.a = 1.0
+                        sphere_list_control = InteractiveMarkerControl()
+                        sphere_list_control.always_visible = True
+                        sphere_list_control.markers.append(sphere_list_marker)
+
+                        int_marker.controls.append(sphere_list_control)
 
                 server.insert(int_marker, processFeedback)
                 server.applyChanges()

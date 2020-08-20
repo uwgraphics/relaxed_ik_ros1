@@ -6,6 +6,7 @@ import rospkg
 import ctypes
 from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
 from std_msgs.msg import Float64
+from timeit import default_timer as timer
 
 class Opt(ctypes.Structure):
     _fields_ = [("data", ctypes.POINTER(ctypes.c_double)), ("length", ctypes.c_int)]
@@ -52,7 +53,10 @@ def main(args=None):
             quat_arr[4*i+2] = p.orientation.z
             quat_arr[4*i+3] = p.orientation.w
 
+        # start = timer()
         xopt = lib.solve(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
+        # end = timer()
+        # print("Speed: {}".format(1.0 / (end - start)))
 
         ja = JointAngles()
         ja.header = header
