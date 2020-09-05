@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     path_to_src = os.path.dirname(__file__)
 
-    info_file_name = open(path_to_src + '/relaxed_ik_core/config/loaded_robot', 'r').read()
+    info_file_name = open(path_to_src + '/relaxed_ik_core/config/loaded_robot', 'r').read().strip()
     info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
     info_file = open(info_file_path, 'r')
 
