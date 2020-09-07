@@ -44,6 +44,9 @@ Lastly, update your version of numpy:
 sudo pip install --upgrade numpy
 ```
 
+Pypcd:
+https://github.com/dimatura/pypcd
+
 ### Rust Dependencies (Not optional)
 To use this wrapper, you will first need to install Rust.
 https://www.rust-lang.org/learn/get-started
