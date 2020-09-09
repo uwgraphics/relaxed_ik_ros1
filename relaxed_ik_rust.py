@@ -8,6 +8,8 @@ from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
 from std_msgs.msg import Float64
 from timeit import default_timer as timer
 from visualization_msgs.msg import InteractiveMarkerFeedback
+from cartesian_path import readCartesianPath
+import tf
 
 class Opt(ctypes.Structure):
     _fields_ = [("data", ctypes.POINTER(ctypes.c_double)), ("length", ctypes.c_int)]
@@ -48,38 +50,29 @@ def main(args=None):
     rospy.init_node('relaxed_ik')
 
     rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, dynObstacle_cb)
-
     rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, eePoseGoals_cb)
-
     angles_pub = rospy.Publisher('/relaxed_ik/joint_angle_solutions', JointAngles, queue_size=3)
 
-    while eepg == None: continue
+    waypoints = readCartesianPath(rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_prototype")
+    for p in waypoints:
+        pos_arr = (ctypes.c_double * 3)()
+        quat_arr = (ctypes.c_double * 4)()
 
-    rate = rospy.Rate(3000)
-    while not rospy.is_shutdown():
-        pose_goals = eepg.ee_poses
-        header = eepg.header
-        pos_arr = (ctypes.c_double * (3 * len(pose_goals)))()
-        quat_arr = (ctypes.c_double * (4 * len(pose_goals)))()
+        pos_arr[0] = p.position.x
+        pos_arr[1] = p.position.y
+        pos_arr[2] = p.position.z
 
-        for i in range(len(pose_goals)):
-            p = pose_goals[i]
-            pos_arr[3*i] = p.position.x
-            pos_arr[3*i+1] = p.position.y
-            pos_arr[3*i+2] = p.position.z
+        quat_arr[0] = p.orientation.x
+        quat_arr[1] = p.orientation.y
+        quat_arr[2] = p.orientation.z
+        quat_arr[3] = p.orientation.w
 
-            quat_arr[4*i] = p.orientation.x
-            quat_arr[4*i+1] = p.orientation.y
-            quat_arr[4*i+2] = p.orientation.z
-            quat_arr[4*i+3] = p.orientation.w
-
-        start = timer()
+        # start = timer()
         xopt = lib.solve(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
-        end = timer()
-        print("Speed: {}".format(1.0 / (end - start)))
+        # end = timer()
+        # print("Speed: {}".format(1.0 / (end - start)))
 
         ja = JointAngles()
-        ja.header = header
         ja_str = "["
         for i in range(xopt.length):
             ja.angles.data.append(xopt.data[i])
@@ -89,10 +82,51 @@ def main(args=None):
             else: 
                 ja_str += ", "
 
+        print(ja_str)
         angles_pub.publish(ja)
-        # print(ja_str)
+        # tf_listener = tf.TransformListener()
+        # tf_listener.lookupTransform()
 
-        rate.sleep()
+    # while eepg == None: continue
+
+    # rate = rospy.Rate(3000)
+    # while not rospy.is_shutdown():
+    #     pose_goals = eepg.ee_poses
+    #     header = eepg.header
+    #     pos_arr = (ctypes.c_double * (3 * len(pose_goals)))()
+    #     quat_arr = (ctypes.c_double * (4 * len(pose_goals)))()
+
+    #     for i in range(len(pose_goals)):
+    #         p = pose_goals[i]
+    #         pos_arr[3*i] = p.position.x
+    #         pos_arr[3*i+1] = p.position.y
+    #         pos_arr[3*i+2] = p.position.z
+
+    #         quat_arr[4*i] = p.orientation.x
+    #         quat_arr[4*i+1] = p.orientation.y
+    #         quat_arr[4*i+2] = p.orientation.z
+    #         quat_arr[4*i+3] = p.orientation.w
+
+    #     start = timer()
+    #     xopt = lib.solve(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
+    #     end = timer()
+    #     print("Speed: {}".format(1.0 / (end - start)))
+
+    #     ja = JointAngles()
+    #     ja.header = header
+    #     ja_str = "["
+    #     for i in range(xopt.length):
+    #         ja.angles.data.append(xopt.data[i])
+    #         ja_str += str(xopt.data[i])
+    #         if i == xopt.length - 1:
+    #             ja_str += "]"
+    #         else: 
+    #             ja_str += ", "
+
+    #     angles_pub.publish(ja)
+    #     # print(ja_str)
+
+    #     rate.sleep()
 
 if __name__ == '__main__':
     main()
