@@ -1,20 +1,21 @@
 #! /usr/bin/env python
 
-import rospy
-import sys
-import os
-import rospkg
 import ctypes
 import moveit_commander
+import moveit_msgs.msg
+import os
+import rospkg
+import rospy
+import sys
+import transformations as T
+
+from cartesian_path import readCartesianPath
+from geometry_msgs.msg import Pose, PoseStamped
 from moveit_commander.conversions import pose_to_list
 from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
-import moveit_msgs.msg
 from std_msgs.msg import Float64, String
-from geometry_msgs.msg import Pose, PoseStamped
-from visualization_msgs.msg import InteractiveMarkerFeedback
 from timeit import default_timer as timer
-import transformations as T
-from cartesian_path import readCartesianPath
+from visualization_msgs.msg import InteractiveMarkerFeedback
 
 def dynObstacle_cb(msg):
     # update dynamic collision obstacles in relaxed IK
@@ -45,9 +46,9 @@ def main(args=None):
 
     rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, dynObstacle_cb)
     rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, eePoseGoals_cb)
-    # angles_pub = rospy.Publisher('/relaxed_ik/joint_angle_solutions', JointAngles, queue_size=3)
-    display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-        moveit_msgs.msg.DisplayTrajectory, queue_size=20)
+    angles_pub = rospy.Publisher('/relaxed_ik/joint_angle_solutions', JointAngles, queue_size=3)
+    # display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
+    #     moveit_msgs.msg.DisplayTrajectory, queue_size=20)
 
     robot = moveit_commander.RobotCommander()
     scene = moveit_commander.PlanningSceneInterface()
@@ -85,15 +86,35 @@ def main(args=None):
 
     # start = timer()
     (plan, fraction) = move_group.compute_cartesian_path(waypoints, 0.01, 0.0)
-    move_group.execute(plan)
     # end = timer()
     # print("Speed: {}".format(1.0 / (end - start)))
+
+    # print(plan)
+
+    # move_group.execute(plan)
+    
+    ja_stream = []
+    for pt in plan.joint_trajectory.points[1:]:
+        ja_stream.append(list(pt.positions))
+    print("============ Size of the joint state stream: {}".format(len(ja_stream)))
+    print(ja_stream)
+
+    rate = rospy.Rate(300)
+    index = 0
+    while not rospy.is_shutdown():
+        ja = JointAngles()
+        ja.angles.data = ja_stream[index]
+        angles_pub.publish(ja)
+        if index < len(ja_stream) - 1:
+            index = index + 1
+        rate.sleep()
     
     print("============ Waiting while RVIZ displays plan...")
-    display_trajectory = moveit_msgs.msg.DisplayTrajectory()
-    display_trajectory.trajectory_start = robot.get_current_state()
-    display_trajectory.trajectory.append(plan)
-    display_trajectory_publisher.publish(display_trajectory)
+    
+    # display_trajectory = moveit_msgs.msg.DisplayTrajectory()
+    # display_trajectory.trajectory_start = robot.get_current_state()
+    # display_trajectory.trajectory.append(plan)
+    # display_trajectory_publisher.publish(display_trajectory)
 
     # while eepg == None: continue
 

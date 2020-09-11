@@ -183,19 +183,108 @@ Visualization Manager:
       Value: true
       Visual Enabled: true
     - Class: rviz/TF
-      Enabled: false
+      Enabled: true
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        base:
+          Value: true
+        common_world:
+          Value: true
+        controller_box:
+          Value: true
+        head:
+          Value: true
+        head_camera:
+          Value: true
+        pedestal:
+          Value: true
+        pedestal_feet:
+          Value: true
+        right_arm_base_link:
+          Value: true
+        right_arm_itb:
+          Value: true
+        right_hand:
+          Value: true
+        right_hand_camera:
+          Value: true
+        right_l0:
+          Value: true
+        right_l1:
+          Value: true
+        right_l1_2:
+          Value: true
+        right_l2:
+          Value: true
+        right_l2_2:
+          Value: true
+        right_l3:
+          Value: true
+        right_l4:
+          Value: true
+        right_l4_2:
+          Value: true
+        right_l5:
+          Value: true
+        right_l6:
+          Value: true
+        right_torso_itb:
+          Value: true
+        right_wrist:
+          Value: true
+        screen:
+          Value: true
+        torso:
+          Value: true
       Marker Scale: 0.20000000298023224
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        base:
+          common_world:
+            {}
+          controller_box:
+            {}
+          pedestal:
+            {}
+          pedestal_feet:
+            {}
+          right_arm_base_link:
+            right_l0:
+              head:
+                head_camera:
+                  {}
+                screen:
+                  {}
+              right_l1:
+                right_l1_2:
+                  {}
+                right_l2:
+                  right_l2_2:
+                    {}
+                  right_l3:
+                    right_l4:
+                      right_arm_itb:
+                        {}
+                      right_l4_2:
+                        {}
+                      right_l5:
+                        right_hand_camera:
+                          {}
+                        right_l6:
+                          right_hand:
+                            {}
+                        right_wrist:
+                          {}
+              right_torso_itb:
+                {}
+          torso:
+            {}
       Update Interval: 0
-      Value: false
+      Value: true
     - Class: rviz/Marker
       Enabled: true
       Marker Topic: /visualization_marker
