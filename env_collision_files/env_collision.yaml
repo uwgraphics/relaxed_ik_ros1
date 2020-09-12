@@ -1,32 +1,36 @@
 robot_link_radius: 0.05
 boxes:
-  # - name: plane1
-  #   parameters: [0.35,0.6,0.002]
-  #   is_dynamic: 0
-  #   rotation: [0.0,0.0,0.0]
-  #   translation: [0.6,0.0,0.15]
+  - name: plane1
+    parameters: [0.35,0.6,0.002]
+    is_dynamic: 0
+    rotation: [0.0,0.0,0.0]
+    translation: [0.6,0.0,0.15]
   # - name: plane2
   #   parameters: [0.35,0.6,0.002]
   #   coordinate_frame: 0
   #   rotation: [-0.2,0.5,0.0]
   #   translation: [0.4,0.0,0.7]
 spheres:
-  # - name: sphere1
-  #   parameters: 0.1
-  #   is_dynamic: 1
-  #   translation: [0.4,0.5,0.25]
-  # - name: sphere2
-  #   parameters: 0.15
-  #   is_dynamic: 1
-  #   translation: [0.3,-0.4,0.3]
-  # - name: sphere3
-  #   parameters: 0.12
-  #   is_dynamic: 1
-  #   translation: [0.7,0.25,0.2]
-  # - name: sphere4
-  #   parameters: 0.06
-  #   is_dynamic: 1
-  #   translation: [0.6,-0.1,0.6]
+  - name: sphere1
+    parameters: 0.1
+    is_dynamic: 1
+    cartesian_path: cartesian_path_prototype
+    translation: [0.4,0.5,0.25]
+  - name: sphere2
+    parameters: 0.15
+    is_dynamic: 1
+    cartesian_path: cartesian_path_prototype
+    translation: [0.3,-0.4,0.3]
+  - name: sphere3
+    parameters: 0.12
+    is_dynamic: 1
+    cartesian_path: cartesian_path_prototype
+    translation: [0.8,-0.2,0.3]
+  - name: sphere4
+    parameters: 0.06
+    is_dynamic: 1
+    cartesian_path: cartesian_path_prototype
+    translation: [0.6,-0.1,0.6]
 point_cloud:
   # - name: sphere_list1
   #   parameters: 0.01

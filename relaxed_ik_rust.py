@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import cartesian_path
 import ctypes
 import numpy
 import os
@@ -8,7 +9,6 @@ import rospy
 import transformations as T
 import yaml
 
-from cartesian_path import readCartesianPath
 from pykdl_utils.kdl_kinematics import KDLKinematics
 from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
 from std_msgs.msg import Float64
@@ -72,7 +72,8 @@ def main(args=None):
     init_trans = [pose[0,3], pose[1,3], pose[2,3]]
     init_rot = T.quaternion_from_matrix(pose)
 
-    waypoints = readCartesianPath(rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_prototype")
+    waypoints = cartesian_path.read_cartesian_path(rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/cartesian_path_prototype")
+    
     goal = waypoints[len(waypoints)-1]
     trans_rel_goal = [goal.position.x, goal.position.y, goal.position.z]
     rot_rel_goal = [goal.orientation.w, goal.orientation.x, goal.orientation.y, goal.orientation.z]
@@ -84,9 +85,11 @@ def main(args=None):
     index = 0
     # eef_step = 0.002
     # eef_last_trans = init_trans
+    pos_goal_tolerance = 0.001
+    quat_goal_tolerance = 0.001
     dis = numpy.linalg.norm(numpy.array(init_trans) - numpy.array(trans_goal))
     angle_between = numpy.linalg.norm(T.quaternion_disp(init_rot, rot_goal)) * 2.0
-    while not (dis < 0.001 and angle_between < 0.001 and index == len(waypoints) - 1):
+    while not (dis < pos_goal_tolerance and angle_between < quat_goal_tolerance and index == len(waypoints) - 1):
         p = waypoints[index]
         pos_arr = (ctypes.c_double * 3)()
         quat_arr = (ctypes.c_double * 4)()

@@ -178,8 +178,7 @@ if __name__ == '__main__':
     pcl_pub = rospy.Publisher("/my_pcl_topic", PointCloud2, queue_size=10)
     points_msgs = []
 
-    env_collision_on = False
-
+    env_collision_on = True
     if env_collision_on: 
         env_collision_file_path = path_to_src + '/env_collision_files/env_collision.yaml'
         
