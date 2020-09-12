@@ -26,11 +26,35 @@ def read_cartesian_path(filename):
 
     return waypoints
 
+def get_abs_waypoints(relative_waypoints, init_pose):
+    waypoints = []
+    for relative_goal in relative_waypoints:
+        relative_orientation_goal = [relative_goal.orientation.w, relative_goal.orientation.x, relative_goal.orientation.y, relative_goal.orientation.z]
+        
+        goal = Pose()
+        goal.position.x = relative_goal.position.x + init_pose.position.x
+        goal.position.y = relative_goal.position.y + init_pose.position.y
+        goal.position.z = relative_goal.position.z + init_pose.position.z
+
+        init_orientation = [init_pose.orientation.w, init_pose.orientation.x, init_pose.orientation.y, init_pose.orientation.z]
+        goal_orientation = T.quaternion_multiply(relative_orientation_goal, init_orientation)
+        goal.orientation.w = goal_orientation[0]
+        goal.orientation.x = goal_orientation[1]
+        goal.orientation.y = goal_orientation[2]
+        goal.orientation.z = goal_orientation[3]
+        waypoints.append(goal)
+
+    return waypoints
+
 def linear_interpolate(waypoints, keyframe):
     if keyframe < 0 or keyframe > len(waypoints) - 1:
         return
-    wpose = Pose()
+
     floor = int(keyframe)
+    if (keyframe - floor == 0.0):
+        return waypoints[floor]
+        
+    wpose = Pose()
     dx = waypoints[floor + 1].position.x - waypoints[floor].position.x
     wpose.position.x = waypoints[floor].position.x + (keyframe - floor) * dx
     dy = waypoints[floor + 1].position.y - waypoints[floor].position.y

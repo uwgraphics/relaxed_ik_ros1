@@ -9,21 +9,21 @@ PLEASE DO NOT CHANGE CODE IN THIS FILE.  IF TRYING TO SET UP RELAXEDIK, PLEASE R
 AND FOLLOW THE STEP-BY-STEP INSTRUCTIONS THERE.  Thanks!
 '''
 
-import rospy
-import yaml
-import roslaunch
-import tf
-import os
-from sensor_msgs.msg import JointState
-from relaxed_ik_ros1.msg import JointAngles
-
-import os.path
-import transformations as T
-from interactive_markers.interactive_marker_server import *
-from visualization_msgs.msg import *
-from sensor_msgs.msg import PointCloud2, PointField
-import sensor_msgs.point_cloud2 as pcl2
+import cartesian_path
 import numpy
+import os
+import roslaunch
+import rospkg
+import rospy
+import sensor_msgs.point_cloud2 as pcl2
+import tf
+import transformations as T
+import yaml
+
+from interactive_markers.interactive_marker_server import *
+from relaxed_ik_ros1.msg import JointAngles
+from sensor_msgs.msg import JointState, PointCloud2, PointField
+from visualization_msgs.msg import *
 
 ja_solution = ''
 def ja_solution_cb(data):
@@ -35,6 +35,16 @@ def ja_solution_cb(data):
 def processFeedback(feedback):
     p = feedback.pose.position
     print (feedback.marker_name + " is now at " + str(p.x) + ", " + str(p.y) + ", " + str(p.z))
+
+def is_point(pt):
+    if len(pt) < 3:
+        return False
+    for e in pt:
+        try:
+            float(e)
+        except ValueError:
+            return False
+    return True
 
 def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic):                
     int_marker = InteractiveMarker()
@@ -60,7 +70,7 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic):
     marker.color.g = 0.5
     marker.color.b = 0.5
     marker.color.a = 1.0
-    if shape == "cuboid":
+    if shape == "box":
         marker.type = Marker.CUBE
     else:
         marker.type = Marker.SPHERE
@@ -99,7 +109,7 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic):
         my_control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(my_control)
 
-        if shape == "cuboid":
+        if shape == "box":
             rx_control = InteractiveMarkerControl()
             rx_control.orientation.w = c
             rx_control.orientation.x = c
@@ -127,21 +137,78 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic):
             ry_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
             int_marker.controls.append(ry_control)
 
-    server.insert(int_marker, processFeedback)
-
     return int_marker
 
-def is_point(pt):
-    if len(pt) < 3:
-        return False
-    for e in pt:
-        try:
-            float(e)
-        except ValueError:
-            return False
-    return True
+def set_collision_world(server, path_to_src, fixed_frame):
+    env_collision_file_path = path_to_src + '/env_collision_files/env_collision.yaml'
+        
+    if os.path.exists(env_collision_file_path):
+        env_collision_file = open(env_collision_file_path, 'r')
+        env_collision = yaml.load(env_collision_file)
+        
+        dynamic_obstacle_path = []
+        points_msgs = []
 
-if __name__ == '__main__':
+        if 'boxes' in env_collision: 
+            planes = env_collision['boxes']
+            if planes is not None:
+                for i, p in enumerate(planes):
+                    int_marker = makeMarker(p['name'], fixed_frame, "box", p['translation'], p['rotation'], p['parameters'], p['is_dynamic'])
+                    server.insert(int_marker, processFeedback)
+                    if 'cartesian_path' in p and p['cartesian_path'] is not None:
+                        path = rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/" + p['cartesian_path']
+                        relative_waypoints = cartesian_path.read_cartesian_path(path)
+                        waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                        dynamic_obstacle_path.append((int_marker.name, waypoints))
+
+        if 'spheres' in env_collision:
+            spheres = env_collision['spheres']
+            if spheres is not None:
+                for i, s in enumerate(spheres):
+                    radius = s['parameters']
+                    int_marker = makeMarker(s['name'], fixed_frame, "sphere", s['translation'], [0, 0, 0], [radius, radius, radius], s['is_dynamic'])
+                    server.insert(int_marker, processFeedback)
+                    if 'cartesian_path' in s and s['cartesian_path'] is not None:
+                        path = rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/" + s['cartesian_path']
+                        relative_waypoints = cartesian_path.read_cartesian_path(path)
+                        waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                        dynamic_obstacle_path.append((int_marker.name, waypoints))
+        
+        server.applyChanges()
+
+        if 'point_cloud' in env_collision: 
+            point_cloud = env_collision['point_cloud']
+            if point_cloud is not None:
+                for pc in point_cloud:
+                    scale = pc['scale']
+                    ts = pc['translation']
+                    rots = pc['rotation']
+
+                    header = Header()
+                    header.stamp = rospy.Time.now()
+                    header.frame_id = fixed_frame
+                    fields = [PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1), 
+                        PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
+                        PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1)]
+
+                    pcd_path = path_to_src + '/env_collision_files/' + pc['file']
+                    points = []
+                    with open(pcd_path, 'r') as point_cloud_file:
+                        lines = point_cloud_file.read().split('\n')
+                        for line in lines:
+                            pt = line.split(' ')
+                            if is_point(pt):
+                                pt_list = [float(pt[0]), float(pt[1]), float(pt[2]), 0.0]
+                                rot_mat = T.euler_matrix(rots[0], rots[1], rots[2])
+                                pt_rot = numpy.matmul(rot_mat, pt_list).tolist()
+                                pt_new = [scale[0]*pt_rot[0]+ts[0], scale[1]*pt_rot[1]+ts[1], scale[2]*pt_rot[2]+ts[2]]
+                                points.append(pt_new)
+
+                    points_msgs.append(pcl2.create_cloud(header, fields, points))
+        
+        return (dynamic_obstacle_path, points_msgs)
+
+def main(args=None):
     rospy.init_node('rviz_viewer')
 
     path_to_src = os.path.dirname(__file__)
@@ -175,73 +242,34 @@ if __name__ == '__main__':
     launch = roslaunch.parent.ROSLaunchParent(uuid, [launch_path])
     launch.start()
 
+    server = InteractiveMarkerServer("simple_marker")
     pcl_pub = rospy.Publisher("/my_pcl_topic", PointCloud2, queue_size=10)
-    points_msgs = []
+    
+    args = rospy.myargv(argv=sys.argv)
+    if args[1] == "true": 
+        (dynamic_obstacle_path, points_msgs) = set_collision_world(server, path_to_src, fixed_frame)
 
-    env_collision_on = True
-    if env_collision_on: 
-        env_collision_file_path = path_to_src + '/env_collision_files/env_collision.yaml'
-        
-        if os.path.exists(env_collision_file_path):
-            env_collision_file = open(env_collision_file_path, 'r')
-            env_collision = yaml.load(env_collision_file)
-            
-            server = InteractiveMarkerServer("simple_marker")
+    rospy.sleep(2)
 
-            if 'boxes' in env_collision: 
-                planes = env_collision['boxes']
-                if planes is not None:
-                    for i, p in enumerate(planes):
-                        makeMarker(p['name'], fixed_frame, "cuboid", p['translation'], p['rotation'], p['parameters'], p['is_dynamic'])
-
-            if 'spheres' in env_collision:
-                spheres = env_collision['spheres']
-                if spheres is not None:
-                    for i, s in enumerate(spheres):
-                        radius = s['parameters']
-                        int_marker = makeMarker(s['name'], fixed_frame, "sphere", s['translation'], [0, 0, 0], [radius, radius, radius], s['is_dynamic'])
-                        # print(int_marker)
-            
-            server.applyChanges()
-
-            if 'point_cloud' in env_collision: 
-                point_cloud = env_collision['point_cloud']
-                if point_cloud is not None:
-                    for pc in point_cloud:
-                        scale = pc['scale']
-                        ts = pc['translation']
-                        rots = pc['rotation']
-
-                        header = Header()
-                        header.stamp = rospy.Time.now()
-                        header.frame_id = fixed_frame
-                        fields = [PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1), 
-                            PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
-                            PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1)]
-
-                        pcd_path = path_to_src + '/env_collision_files/' + pc['file']
-                        points = []
-                        with open(pcd_path, 'r') as point_cloud_file:
-                            lines = point_cloud_file.read().split('\n')
-                            for line in lines:
-                                pt = line.split(' ')
-                                if is_point(pt):
-                                    pt_list = [float(pt[0]), float(pt[1]), float(pt[2]), 0.0]
-                                    rot_mat = T.euler_matrix(rots[0], rots[1], rots[2])
-                                    pt_rot = numpy.matmul(rot_mat, pt_list).tolist()
-                                    pt_new = [scale[0]*pt_rot[0]+ts[0], scale[1]*pt_rot[1]+ts[1], scale[2]*pt_rot[2]+ts[2]]
-                                    points.append(pt_new)
-
-                        points_msgs.append(pcl2.create_cloud(header, fields, points))
-                        
-    prev_state = []
-
-    rate = rospy.Rate(200.0)
+    rate = rospy.Rate(300.0)
     prev_sol = starting_config
+    keyframe = [0] * len(dynamic_obstacle_path)
+    step = 0.1
     while not rospy.is_shutdown():
         tf_pub.sendTransform((0, 0, 0),tf.transformations.quaternion_from_euler(0, 0, 0),
             rospy.Time.now(), 'common_world', fixed_frame)
-        
+
+        updated = False
+        for i, (name, waypoints) in enumerate(dynamic_obstacle_path):
+            if keyframe[i] < len(waypoints) - 1 - step:
+                pose = cartesian_path.linear_interpolate(waypoints, keyframe[i])
+                server.setPose(name, pose)    
+                keyframe[i] += step
+                updated = True
+
+        if updated:
+            server.applyChanges()
+
         if len(points_msgs) > 0:
             for msg in points_msgs:
                 msg.header.stamp = rospy.Time.now()
@@ -265,4 +293,7 @@ if __name__ == '__main__':
         js.header.stamp = rospy.Time.now()
         js_pub.publish(js)
 	
-    rate.sleep()
+        rate.sleep()
+
+if __name__ == '__main__':
+    main()

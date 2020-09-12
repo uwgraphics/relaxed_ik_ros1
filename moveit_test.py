@@ -128,28 +128,11 @@ def main(args=None):
     print("============ Move group joints: {}".format(move_group.get_joints()))
     print("============ Planning frame: {}".format(move_group.get_planning_frame()))
     print("============ End effector link: {}".format(move_group.get_end_effector_link()))
-    
-    init_pose = move_group.get_current_pose()
-    init_position = init_pose.pose.position
-    init_orientation = [init_pose.pose.orientation.w, init_pose.pose.orientation.x, init_pose.pose.orientation.y, init_pose.pose.orientation.z]
 
     rospack = rospkg.RosPack()
     p = rospack.get_path('relaxed_ik_ros1') 
     relative_waypoints = cartesian_path.read_cartesian_path(p + "/cartesian_path_files/cartesian_path_prototype")
-    waypoints = []
-    for relative_goal in relative_waypoints:
-        relative_orientation_goal = [relative_goal.orientation.w, relative_goal.orientation.x, relative_goal.orientation.y, relative_goal.orientation.z]
-        goal = Pose()
-        goal.position.x = relative_goal.position.x + init_position.x
-        goal.position.y = relative_goal.position.y + init_position.y
-        goal.position.z = relative_goal.position.z + init_position.z
-
-        goal_orientation = T.quaternion_multiply(relative_orientation_goal, init_orientation)
-        goal.orientation.w = goal_orientation[0]
-        goal.orientation.x = goal_orientation[1]
-        goal.orientation.y = goal_orientation[2]
-        goal.orientation.z = goal_orientation[3]
-        waypoints.append(goal)
+    waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, move_group.get_current_pose().pose)
 
     # print(waypoints)
 
@@ -179,50 +162,6 @@ def main(args=None):
         rate.sleep()
     
     print("============ Waiting while RVIZ displays plan...")
-    
-    # display_trajectory = moveit_msgs.msg.DisplayTrajectory()
-    # display_trajectory.trajectory_start = robot.get_current_state()
-    # display_trajectory.trajectory.append(plan)
-    # display_trajectory_publisher.publish(display_trajectory)
-
-    # while eepg == None: continue
-
-    # rate = rospy.Rate(3000)
-    # while not rospy.is_shutdown():
-    #     pose_goals = eepg.ee_poses
-    #     header = eepg.header
-
-    #     relative_goal = pose_goals[0]
-    #     relative_orientation_goal = [relative_goal.orientation.w, relative_goal.orientation.x, relative_goal.orientation.y, relative_goal.orientation.z]
-    #     goal = Pose()
-    #     goal.position.x = relative_goal.position.x + init_position.x
-    #     goal.position.y = relative_goal.position.y + init_position.y
-    #     goal.position.z = relative_goal.position.z + init_position.z
-
-    #     goal_orientation = T.quaternion_multiply(init_orientation, relative_orientation_goal)
-    #     goal.orientation.w = goal_orientation[0]
-    #     goal.orientation.x = goal_orientation[1]
-    #     goal.orientation.y = goal_orientation[2]
-    #     goal.orientation.z = goal_orientation[3]
-        
-    #     move_group.set_pose_target(goal, end_effector_link="right_hand")
-    #     move_group.set_goal_tolerance(0.01)
-
-    #     move_group.go(wait=True)
-    #     print(move_group.get_current_pose())
-    #     move_group.stop()
-    #     move_group.clear_pose_targets()
-
-    #     joint_values = move_group.get_current_joint_values()
-    #     ja = JointAngles()
-    #     ja.header = header
-    #     for j in joint_values:
-    #         ja.angles.data.append(j)
-
-    #     angles_pub.publish(ja)
-    #     print(joint_values)
-
-    #     rate.sleep()
 
 if __name__ == '__main__':
     main()
