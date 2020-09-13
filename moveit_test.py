@@ -3,7 +3,6 @@
 import cartesian_path
 import ctypes
 import moveit_commander
-import moveit_msgs.msg
 import os
 import rospkg
 import rospy
@@ -13,24 +12,27 @@ import yaml
 
 from geometry_msgs.msg import Pose, PoseStamped
 from moveit_commander.conversions import pose_to_list
+from moveit_msgs.msg import PlanningScene, CollisionObject
+from moveit_msgs.srv import ApplyPlanningScene, ApplyPlanningSceneRequest
 from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
+from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import Float64, String
 from timeit import default_timer as timer
-from visualization_msgs.msg import InteractiveMarkerFeedback
+from visualization_msgs.msg import InteractiveMarkerFeedback, InteractiveMarkerUpdate
 
-def dynObstacle_cb(msg):
-    # update dynamic collision obstacles in relaxed IK
-    pos_arr = (ctypes.c_double * 3)()
-    quat_arr = (ctypes.c_double * 4)()
+def marker_feedback_cb(msg, scene):
+    # update dynamic collision obstacles in moveit
+    co = scene.get_objects([msg.marker_name])[msg.marker_name]
+    update_collision_object([co], [msg.pose])
 
-    pos_arr[0] = msg.pose.position.x
-    pos_arr[1] = msg.pose.position.y
-    pos_arr[2] = msg.pose.position.z
-
-    quat_arr[0] = msg.pose.orientation.x
-    quat_arr[1] = msg.pose.orientation.y
-    quat_arr[2] = msg.pose.orientation.z
-    quat_arr[3] = msg.pose.orientation.w
+def marker_update_cb(msg, scene):
+    # update dynamic collision obstacles in moveit
+    collison_objects = []
+    poses = []
+    for pose_stamped in msg.poses:
+        collison_objects.append(scene.get_objects([pose_stamped.name])[pose_stamped.name])
+        poses.append(pose_stamped.pose)
+    update_collision_object(collison_objects, poses)
 
 def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale, is_dynamic):
     p = PoseStamped()
@@ -50,6 +52,33 @@ def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale,
         scene.add_sphere(name, p, scale[0])
 
     print(name)
+
+co_pub = rospy.Publisher('/collision_object', CollisionObject, queue_size=100)
+service_timeout = 5.0
+planning_scene_service = rospy.ServiceProxy('/apply_planning_scene', ApplyPlanningScene)
+planning_scene_service.wait_for_service(service_timeout)
+def update_collision_object(collison_objects, new_poses, synchronous=True):
+    new_co = []
+    for i, old_co in enumerate(collison_objects):
+        co = CollisionObject()
+        co.operation = CollisionObject.MOVE
+        co.id = old_co.id
+        co.header = old_co.header
+        co.primitives = old_co.primitives
+        co.primitive_poses = [new_poses[i]]
+        new_co.append(co)
+
+    if synchronous:
+        scene = PlanningScene()
+        scene.is_diff = True
+        scene.robot_state.is_diff = True
+        scene.world.collision_objects = new_co
+        diff_req = ApplyPlanningSceneRequest()
+        diff_req.scene = scene
+        planning_scene_service.call(diff_req)
+    else:
+        for co in new_co:
+            co_pub.publish(co)
 
 def set_collision_world(robot, scene):
     planning_frame = robot.get_planning_frame()
@@ -108,26 +137,25 @@ def main(args=None):
     moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('move_group_python_interface', anonymous=True)
 
-    rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, dynObstacle_cb)
-    # rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, eePoseGoals_cb)
     angles_pub = rospy.Publisher('/relaxed_ik/joint_angle_solutions', JointAngles, queue_size=3)
-    # display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-    #     moveit_msgs.msg.DisplayTrajectory, queue_size=20)
-
+    
     robot = moveit_commander.RobotCommander()
     scene = moveit_commander.PlanningSceneInterface()
-
-    rospy.sleep(2)
-    set_collision_world(robot, scene)
-    print("============ Collision objects: {}".format(scene.get_objects()))
 
     move_group = moveit_commander.MoveGroupCommander("right_arm")
     move_group.set_end_effector_link("right_hand")
 
+    rospy.sleep(2)
+    set_collision_world(robot, scene)
+
+    print("============ Collision objects: {}".format(scene.get_objects()))
     print("============ Available Planning Groups: {}".format(robot.get_group_names()))
     print("============ Move group joints: {}".format(move_group.get_joints()))
     print("============ Planning frame: {}".format(move_group.get_planning_frame()))
     print("============ End effector link: {}".format(move_group.get_end_effector_link()))
+
+    rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, marker_feedback_cb, scene)
+    rospy.Subscriber('/simple_marker/update', InteractiveMarkerUpdate, marker_update_cb, scene)
 
     rospack = rospkg.RosPack()
     p = rospack.get_path('relaxed_ik_ros1') 
@@ -135,6 +163,14 @@ def main(args=None):
     waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, move_group.get_current_pose().pose)
 
     # print(waypoints)
+
+    initialized = False
+    while not initialized: 
+        try: 
+            param = rospy.get_param("exp_status")
+            initialized = param == "go"
+        except KeyError:
+            initialized = False
 
     # start = timer()
     (plan, fraction) = move_group.compute_cartesian_path(waypoints, 0.01, 0.0)

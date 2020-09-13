@@ -249,26 +249,32 @@ def main(args=None):
     if args[1] == "true": 
         (dynamic_obstacle_path, points_msgs) = set_collision_world(server, path_to_src, fixed_frame)
 
-    rospy.sleep(2)
-
     rate = rospy.Rate(300.0)
     prev_sol = starting_config
     keyframe = [0] * len(dynamic_obstacle_path)
     step = 0.1
+    initialized = False
     while not rospy.is_shutdown():
         tf_pub.sendTransform((0, 0, 0),tf.transformations.quaternion_from_euler(0, 0, 0),
             rospy.Time.now(), 'common_world', fixed_frame)
 
-        updated = False
-        for i, (name, waypoints) in enumerate(dynamic_obstacle_path):
-            if keyframe[i] < len(waypoints) - 1 - step:
-                pose = cartesian_path.linear_interpolate(waypoints, keyframe[i])
-                server.setPose(name, pose)    
-                keyframe[i] += step
-                updated = True
+        try: 
+            param = rospy.get_param("exp_status")
+            initialized = param == "go"
+        except KeyError:
+            initialized = False
 
-        if updated:
-            server.applyChanges()
+        if initialized:
+            updated = False
+            for i, (name, waypoints) in enumerate(dynamic_obstacle_path):
+                if keyframe[i] < len(waypoints) - 1 - step:
+                    pose = cartesian_path.linear_interpolate(waypoints, keyframe[i])
+                    server.setPose(name, pose)    
+                    keyframe[i] += step
+                    updated = True
+
+            if updated:
+                server.applyChanges()
 
         if len(points_msgs) > 0:
             for msg in points_msgs:

@@ -14,7 +14,7 @@ from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
 from std_msgs.msg import Float64
 from timeit import default_timer as timer
 from urdf_parser_py.urdf import URDF
-from visualization_msgs.msg import InteractiveMarkerFeedback
+from visualization_msgs.msg import InteractiveMarkerFeedback, InteractiveMarkerUpdate
 
 class Opt(ctypes.Structure):
     _fields_ = [("data", ctypes.POINTER(ctypes.c_double)), ("length", ctypes.c_int)]
@@ -26,7 +26,7 @@ os.chdir(p + "/relaxed_ik_core")
 lib = ctypes.cdll.LoadLibrary(p + '/relaxed_ik_core/target/debug/librelaxed_ik_lib.so')
 lib.solve.restype = Opt
 
-def dynObstacle_cb(msg):
+def marker_feedback_cb(msg):
     # update dynamic collision obstacles in relaxed IK
     pos_arr = (ctypes.c_double * 3)()
     quat_arr = (ctypes.c_double * 4)()
@@ -42,6 +42,23 @@ def dynObstacle_cb(msg):
 
     lib.dynamic_obstacle_cb(msg.marker_name, pos_arr, quat_arr)
 
+def marker_update_cb(msg):
+    # update dynamic collision obstacles in relaxed IK
+    for pose_stamped in msg.poses:
+        pos_arr = (ctypes.c_double * 3)()
+        quat_arr = (ctypes.c_double * 4)()
+
+        pos_arr[0] = pose_stamped.pose.position.x
+        pos_arr[1] = pose_stamped.pose.position.y
+        pos_arr[2] = pose_stamped.pose.position.z
+
+        quat_arr[0] = pose_stamped.pose.orientation.x
+        quat_arr[1] = pose_stamped.pose.orientation.y
+        quat_arr[2] = pose_stamped.pose.orientation.z
+        quat_arr[3] = pose_stamped.pose.orientation.w
+
+        lib.dynamic_obstacle_cb(pose_stamped.name, pos_arr, quat_arr)
+
 eepg = None
 def eePoseGoals_cb(msg):
     global eepg
@@ -54,7 +71,8 @@ def main(args=None):
 
     rospy.init_node('relaxed_ik')
 
-    rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, dynObstacle_cb)
+    rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, marker_feedback_cb)
+    rospy.Subscriber('/simple_marker/update', InteractiveMarkerUpdate, marker_update_cb)
     rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, eePoseGoals_cb)
     angles_pub = rospy.Publisher('/relaxed_ik/joint_angle_solutions', JointAngles, queue_size=3)
 
@@ -74,23 +92,24 @@ def main(args=None):
 
     waypoints = cartesian_path.read_cartesian_path(rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/cartesian_path_prototype")
     
-    goal = waypoints[len(waypoints)-1]
-    trans_rel_goal = [goal.position.x, goal.position.y, goal.position.z]
-    rot_rel_goal = [goal.orientation.w, goal.orientation.x, goal.orientation.y, goal.orientation.z]
-    trans_goal = numpy.array(init_trans) + numpy.array(trans_rel_goal)
-    rot_goal = T.quaternion_multiply(rot_rel_goal, init_rot)
-    print("Final goal position: {}\nFinal goal orientation: {}".format(list(trans_goal), list(rot_goal)))
+    initialized = False
+    while not initialized: 
+        try: 
+            param = rospy.get_param("exp_status")
+            initialized = param == "go"
+        except KeyError:
+            initialized = False
 
     ja_stream = []
-    index = 0
-    # eef_step = 0.002
-    # eef_last_trans = init_trans
-    pos_goal_tolerance = 0.001
-    quat_goal_tolerance = 0.001
-    dis = numpy.linalg.norm(numpy.array(init_trans) - numpy.array(trans_goal))
-    angle_between = numpy.linalg.norm(T.quaternion_disp(init_rot, rot_goal)) * 2.0
-    while not (dis < pos_goal_tolerance and angle_between < quat_goal_tolerance and index == len(waypoints) - 1):
-        p = waypoints[index]
+    keyframe = 0.0
+    step = 0.1
+    pos_goal_tolerance = 0.01
+    quat_goal_tolerance = 0.01
+    trans_cur = init_trans
+    rot_cur = init_rot
+    rate = rospy.Rate(300)
+    while not rospy.is_shutdown():
+        p = cartesian_path.linear_interpolate(waypoints, keyframe)
         pos_arr = (ctypes.c_double * 3)()
         quat_arr = (ctypes.c_double * 4)()
 
@@ -102,43 +121,47 @@ def main(args=None):
         quat_arr[1] = p.orientation.y
         quat_arr[2] = p.orientation.z
         quat_arr[3] = p.orientation.w
-
-        # start = timer()
-        xopt = lib.solve(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
-        # end = timer()
-        # print("Speed: {}".format(1.0 / (end - start)))
-
-        ja_list = []
-        for i in range(xopt.length):
-            ja_list.append(xopt.data[i])
         
-        # print(ja_list)
-        ja_stream.append(ja_list)
-
-        pose = kdl_kin.forward(ja_list)
-        trans = [pose[0,3], pose[1,3], pose[2,3]]
-        rot = T.quaternion_from_matrix(pose)
-        # print(trans, rot)
+        trans_goal = numpy.array(init_trans) + numpy.array([p.position.x, p.position.y, p.position.z])
+        rot_goal = T.quaternion_multiply([p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z], init_rot)
+        # print("Next goal position: {}\nNext goal orientation: {}".format(list(trans_goal), list(rot_goal)))
         
-        dis = numpy.linalg.norm(numpy.array(trans) - numpy.array(trans_goal))
-        angle_between = numpy.linalg.norm(T.quaternion_disp(rot, rot_goal)) * 2.0
-        # print(dis, angle_between)
+        dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
+        angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
+        while True:
+            # start = timer()
+            xopt = lib.solve(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
+            # end = timer()
+            # print("Speed: {}".format(1.0 / (end - start)))
 
-        if index < len(waypoints) - 1: 
-            index = index + 1
+            ja = JointAngles()
+            for i in range(xopt.length):
+                ja.angles.data.append(xopt.data[i])
+            angles_pub.publish(ja)
+            
+            # print(ja.angles.data)
+            ja_stream.append(ja.angles.data)
+
+            pose = kdl_kin.forward(ja.angles.data)
+            trans_cur = [pose[0,3], pose[1,3], pose[2,3]]
+            rot_cur = T.quaternion_from_matrix(pose)
+            # print(trans, rot)
+            
+            dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
+            angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
+            # print(dis, angle_between)
+
+            if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance and keyframe < len(waypoints) - 1 - step:
+                keyframe += step
+                break
+
+        if round(keyframe) >= len(waypoints) - 1:
+            break
+
+        rate.sleep()
 
     # print(ja_stream)
     print("\nSize of the joint state stream: {}".format(len(ja_stream)))
-
-    rate = rospy.Rate(300)
-    index = 0
-    while not rospy.is_shutdown():
-        ja = JointAngles()
-        ja.angles.data = ja_stream[index]
-        angles_pub.publish(ja)
-        if index < len(ja_stream) - 1:
-            index = index + 1
-        rate.sleep()
 
     # while eepg == None: continue
 
