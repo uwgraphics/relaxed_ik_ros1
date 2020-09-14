@@ -3,6 +3,7 @@
 import cartesian_path
 import ctypes
 import moveit_commander
+import numpy
 import os
 import rospkg
 import rospy
@@ -14,10 +15,12 @@ from geometry_msgs.msg import Pose, PoseStamped
 from moveit_commander.conversions import pose_to_list
 from moveit_msgs.msg import PlanningScene, CollisionObject
 from moveit_msgs.srv import ApplyPlanningScene, ApplyPlanningSceneRequest
+from pykdl_utils.kdl_kinematics import KDLKinematics
 from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
 from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import Float64, String
 from timeit import default_timer as timer
+from urdf_parser_py.urdf import URDF
 from visualization_msgs.msg import InteractiveMarkerFeedback, InteractiveMarkerUpdate
 
 def marker_feedback_cb(msg, scene):
@@ -138,17 +141,21 @@ def main(args=None):
     rospy.init_node('move_group_python_interface', anonymous=True)
 
     angles_pub = rospy.Publisher('/relaxed_ik/joint_angle_solutions', JointAngles, queue_size=3)
+
+    urdf = URDF.from_parameter_server()
+    kdl_kin = KDLKinematics(urdf, "/base", "/right_hand")
     
     robot = moveit_commander.RobotCommander()
     scene = moveit_commander.PlanningSceneInterface()
 
     move_group = moveit_commander.MoveGroupCommander("right_arm")
     move_group.set_end_effector_link("right_hand")
+    # move_group.allow_replanning(True)
 
     rospy.sleep(2)
     set_collision_world(robot, scene)
 
-    print("============ Collision objects: {}".format(scene.get_objects()))
+    # print("============ Collision objects: {}".format(scene.get_objects()))
     print("============ Available Planning Groups: {}".format(robot.get_group_names()))
     print("============ Move group joints: {}".format(move_group.get_joints()))
     print("============ Planning frame: {}".format(move_group.get_planning_frame()))
@@ -160,7 +167,8 @@ def main(args=None):
     rospack = rospkg.RosPack()
     p = rospack.get_path('relaxed_ik_ros1') 
     relative_waypoints = cartesian_path.read_cartesian_path(p + "/cartesian_path_files/cartesian_path_prototype")
-    waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, move_group.get_current_pose().pose)
+    init_pose = move_group.get_current_pose().pose
+    waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, init_pose)
 
     # print(waypoints)
 
@@ -172,8 +180,65 @@ def main(args=None):
         except KeyError:
             initialized = False
 
+    ja_stream = []
+    keyframe = 0.0
+    step = 1.0
+    pos_goal_tolerance = 0.01
+    quat_goal_tolerance = 0.01
+    trans_cur = [init_pose.position.x, init_pose.position.y, init_pose.position.z]
+    rot_cur = [init_pose.orientation.w, init_pose.orientation.x, init_pose.orientation.y, init_pose.orientation.z]
+    rate = rospy.Rate(300)
+    while not rospy.is_shutdown():
+        # print(keyframe)
+        p = cartesian_path.linear_interpolate(waypoints, keyframe)
+        move_group.set_pose_target(p)
+
+        trans_goal = [p.position.x, p.position.y, p.position.z]
+        rot_goal = [p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z]
+        # print("Next goal position: {}\nNext goal orientation: {}".format(list(trans_goal), list(rot_goal)))
+        
+        dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
+        angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
+        while True:
+            # start = timer()
+            plan = move_group.plan()
+            # end = timer()
+            # print("Speed: {}".format(1.0 / (end - start)))
+            
+            if len(plan.joint_trajectory.points) > 0:
+                ja_list = list(plan.joint_trajectory.points[-1].positions)
+                
+                pose = kdl_kin.forward(ja_list)
+                trans_cur = [pose[0,3], pose[1,3], pose[2,3]]
+                rot_cur = T.quaternion_from_matrix(pose)
+                # print(trans, rot)
+                
+                dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
+                angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
+                # print(dis, angle_between)
+
+                if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance and keyframe < len(waypoints) - 1:
+                    ja = JointAngles()
+                    ja.angles.data = ja_list
+                    angles_pub.publish(ja)
+
+                    ja_stream.append(ja_list)
+                    
+                    move_group.execute(plan)
+                    keyframe += step
+                    break
+
+        if round(keyframe) >= len(waypoints) - 1:
+            break
+
+        rate.sleep()
+
+    print("============ Size of the joint state stream: {}".format(len(ja_stream)))
+    # print(ja_stream)
+
     # start = timer()
-    (plan, fraction) = move_group.compute_cartesian_path(waypoints, 0.01, 0.0)
+    # move_group.allow_replanning(True)
+    # (plan, fraction) = move_group.compute_cartesian_path(waypoints, 0.01, 0.0)
     # end = timer()
     # print("Speed: {}".format(1.0 / (end - start)))
 
@@ -181,23 +246,23 @@ def main(args=None):
 
     # move_group.execute(plan)
     
-    ja_stream = []
-    for pt in plan.joint_trajectory.points[1:]:
-        ja_stream.append(list(pt.positions))
-    print("============ Size of the joint state stream: {}".format(len(ja_stream)))
+    # ja_stream = []
+    # for pt in plan.joint_trajectory.points[1:]:
+    #     ja_stream.append(list(pt.positions))
+    # print("============ Size of the joint state stream: {}".format(len(ja_stream)))
     # print(ja_stream)
 
-    rate = rospy.Rate(300)
-    index = 0
-    while not rospy.is_shutdown():
-        ja = JointAngles()
-        ja.angles.data = ja_stream[index]
-        angles_pub.publish(ja)
-        if index < len(ja_stream) - 1:
-            index = index + 1
-        rate.sleep()
+    # rate = rospy.Rate(300)
+    # index = 0
+    # while not rospy.is_shutdown():
+    #     ja = JointAngles()
+    #     ja.angles.data = ja_stream[index]
+    #     angles_pub.publish(ja)
+    #     if index < len(ja_stream) - 1:
+    #         index = index + 1
+    #     rate.sleep()
     
-    print("============ Waiting while RVIZ displays plan...")
+    # print("============ Waiting while RVIZ displays plan...")
 
 if __name__ == '__main__':
     main()

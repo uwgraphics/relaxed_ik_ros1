@@ -51,8 +51,8 @@ def linear_interpolate(waypoints, keyframe):
         return
 
     floor = int(keyframe)
-    if (keyframe - floor == 0.0):
-        return waypoints[floor]
+    # if (keyframe - floor == 0.0):
+    #     return waypoints[floor]
         
     wpose = Pose()
     dx = waypoints[floor + 1].position.x - waypoints[floor].position.x
@@ -64,7 +64,7 @@ def linear_interpolate(waypoints, keyframe):
 
     q0 = [waypoints[floor].orientation.w, waypoints[floor].orientation.x, waypoints[floor].orientation.y, waypoints[floor].orientation.z]
     q1 = [waypoints[floor + 1].orientation.w, waypoints[floor + 1].orientation.x, waypoints[floor + 1].orientation.y, waypoints[floor + 1].orientation.z]
-    q = T.quaternion_slerp(q0, q1, keyframe - floor)
+    q = T.unit_vector(T.quaternion_slerp(q0, q1, keyframe - floor))
     wpose.orientation.w = q[0]
     wpose.orientation.x = q[1]
     wpose.orientation.y = q[2]
