@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import cartesian_path
+import test_utils
 import ctypes
 import moveit_commander
 import numpy
@@ -37,7 +37,7 @@ def marker_update_cb(msg, scene):
         poses.append(pose_stamped.pose)
     update_collision_object(collison_objects, poses)
 
-def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale, is_dynamic):
+def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale, is_dynamic, filename=''):
     p = PoseStamped()
     p.header.frame_id = planning_frame
     p.pose.position.x = trans[0]
@@ -53,6 +53,8 @@ def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale,
         scene.add_box(name, p, (scale[0] * 2.0, scale[1] * 2.0, scale[2] * 2.0))
     elif shape == 'sphere':
         scene.add_sphere(name, p, scale[0])
+    elif shape == 'pcd':
+        scene.add_mesh(name, p, filename, size=scale)
 
     print(name)
 
@@ -104,35 +106,23 @@ def set_collision_world(robot, scene):
                     radius = s['parameters']
                     add_collision_object(scene, s['name'], planning_frame, "sphere", s['translation'], [0, 0, 0], [radius, radius, radius], s['is_dynamic'])
         
-        # if 'point_cloud' in env_collision: 
-        #     point_cloud = env_collision['point_cloud']
-        #     if point_cloud is not None:
-        #         for pc in point_cloud:
-        #             scale = pc['scale']
-        #             ts = pc['translation']
-        #             rots = pc['rotation']
-
-        #             header = Header()
-        #             header.stamp = rospy.Time.now()
-        #             header.frame_id = fixed_frame
-        #             fields = [PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1), 
-        #                 PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
-        #                 PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1)]
-
-        #             pcd_path = path_to_src + '/env_collision_files/' + pc['file']
-        #             points = []
-        #             with open(pcd_path, 'r') as point_cloud_file:
-        #                 lines = point_cloud_file.read().split('\n')
-        #                 for line in lines:
-        #                     pt = line.split(' ')
-        #                     if is_point(pt):
-        #                         pt_list = [float(pt[0]), float(pt[1]), float(pt[2]), 0.0]
-        #                         rot_mat = T.euler_matrix(rots[0], rots[1], rots[2])
-        #                         pt_rot = numpy.matmul(rot_mat, pt_list).tolist()
-        #                         pt_new = [scale[0]*pt_rot[0]+ts[0], scale[1]*pt_rot[1]+ts[1], scale[2]*pt_rot[2]+ts[2]]
-        #                         points.append(pt_new)
-
-        #             points_msgs.append(pcl2.create_cloud(header, fields, points))
+        if 'point_cloud' in env_collision: 
+            point_cloud = env_collision['point_cloud']
+            if point_cloud is not None:
+                for pc in point_cloud:
+                    pcd_path = path_to_src + '/env_collision_files/' + pc['file']
+                    add_collision_object(scene, pc['name'], planning_frame, "pcd", pc['translation'], pc['rotation'], pc['scale'], pc['is_dynamic'], filename=pcd_path)
+                    # points = []
+                    # with open(pcd_path, 'r') as point_cloud_file:
+                    #     lines = point_cloud_file.read().split('\n')
+                    #     for line in lines:
+                    #         pt = line.split(' ')
+                    #         if is_point(pt):
+                    #             point = Point()
+                    #             point.x = float(pt[0]) * scales[0]
+                    #             point.y = float(pt[1]) * scales[1]
+                    #             point.z = float(pt[2]) * scales[2]
+                    #             points.append(point)
 
 def main(args=None):
     print("\nMoveIt initialized!")
@@ -166,9 +156,9 @@ def main(args=None):
 
     rospack = rospkg.RosPack()
     p = rospack.get_path('relaxed_ik_ros1') 
-    relative_waypoints = cartesian_path.read_cartesian_path(p + "/cartesian_path_files/cartesian_path_prototype")
+    relative_waypoints = test_utils.read_cartesian_path(p + "/cartesian_path_files/cartesian_path_prototype")
     init_pose = move_group.get_current_pose().pose
-    waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, init_pose)
+    waypoints = test_utils.get_abs_waypoints(relative_waypoints, init_pose)
 
     # print(waypoints)
 
@@ -190,79 +180,45 @@ def main(args=None):
     rate = rospy.Rate(300)
     while not rospy.is_shutdown():
         # print(keyframe)
-        p = cartesian_path.linear_interpolate(waypoints, keyframe)
+        p = test_utils.linear_interpolate(waypoints, keyframe)
         move_group.set_pose_target(p)
 
-        trans_goal = [p.position.x, p.position.y, p.position.z]
-        rot_goal = [p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z]
-        # print("Next goal position: {}\nNext goal orientation: {}".format(list(trans_goal), list(rot_goal)))
+        # start = timer()
+        plan = move_group.plan()
+        # end = timer()
+        # print("Speed: {}".format(1.0 / (end - start)))
         
-        dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
-        angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
-        while True:
-            # start = timer()
-            plan = move_group.plan()
-            # end = timer()
-            # print("Speed: {}".format(1.0 / (end - start)))
+        if len(plan.joint_trajectory.points) > 0:
+            ja_list = list(plan.joint_trajectory.points[-1].positions)
             
-            if len(plan.joint_trajectory.points) > 0:
-                ja_list = list(plan.joint_trajectory.points[-1].positions)
+            pose = kdl_kin.forward(ja_list)
+            trans_cur = [pose[0,3], pose[1,3], pose[2,3]]
+            rot_cur = T.quaternion_from_matrix(pose)
+            # print(trans, rot)
+
+            trans_goal = [p.position.x, p.position.y, p.position.z]
+            rot_goal = [p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z]
+            # print("Next goal position: {}\nNext goal orientation: {}".format(list(trans_goal), list(rot_goal)))
+
+            dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
+            angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
+            # print(dis, angle_between)
+
+            if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance and keyframe < len(waypoints) - 1:
+                ja = JointAngles()
+                ja.angles.data = ja_list
+                angles_pub.publish(ja)
+
+                ja_stream.append(ja_list)
                 
-                pose = kdl_kin.forward(ja_list)
-                trans_cur = [pose[0,3], pose[1,3], pose[2,3]]
-                rot_cur = T.quaternion_from_matrix(pose)
-                # print(trans, rot)
-                
-                dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
-                angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
-                # print(dis, angle_between)
+                move_group.execute(plan)
+                keyframe += step
 
-                if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance and keyframe < len(waypoints) - 1:
-                    ja = JointAngles()
-                    ja.angles.data = ja_list
-                    angles_pub.publish(ja)
-
-                    ja_stream.append(ja_list)
-                    
-                    move_group.execute(plan)
-                    keyframe += step
-                    break
-
-        if round(keyframe) >= len(waypoints) - 1:
-            break
+        if round(keyframe) >= len(waypoints) - 1: break
 
         rate.sleep()
 
     print("============ Size of the joint state stream: {}".format(len(ja_stream)))
-    # print(ja_stream)
-
-    # start = timer()
-    # move_group.allow_replanning(True)
-    # (plan, fraction) = move_group.compute_cartesian_path(waypoints, 0.01, 0.0)
-    # end = timer()
-    # print("Speed: {}".format(1.0 / (end - start)))
-
-    # print(plan)
-
-    # move_group.execute(plan)
-    
-    # ja_stream = []
-    # for pt in plan.joint_trajectory.points[1:]:
-    #     ja_stream.append(list(pt.positions))
-    # print("============ Size of the joint state stream: {}".format(len(ja_stream)))
-    # print(ja_stream)
-
-    # rate = rospy.Rate(300)
-    # index = 0
-    # while not rospy.is_shutdown():
-    #     ja = JointAngles()
-    #     ja.angles.data = ja_stream[index]
-    #     angles_pub.publish(ja)
-    #     if index < len(ja_stream) - 1:
-    #         index = index + 1
-    #     rate.sleep()
-    
-    # print("============ Waiting while RVIZ displays plan...")
 
 if __name__ == '__main__':
     main()

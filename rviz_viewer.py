@@ -9,12 +9,12 @@ PLEASE DO NOT CHANGE CODE IN THIS FILE.  IF TRYING TO SET UP RELAXEDIK, PLEASE R
 AND FOLLOW THE STEP-BY-STEP INSTRUCTIONS THERE.  Thanks!
 '''
 
-import cartesian_path
 import numpy
 import os
 import roslaunch
 import rospkg
 import rospy
+import test_utils
 import tf
 import transformations as T
 import yaml
@@ -160,8 +160,8 @@ def set_collision_world(server, path_to_src, fixed_frame):
                     server.insert(int_marker, processFeedback)
                     if 'cartesian_path' in p and p['cartesian_path'] is not None:
                         path = cartesian_folder_path + p['cartesian_path']
-                        relative_waypoints = cartesian_path.read_cartesian_path(path)
-                        waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                        relative_waypoints = test_utils.read_cartesian_path(path)
+                        waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
                         dyn_obstacle_handles.append((int_marker.name, waypoints))
 
         if 'spheres' in env_collision:
@@ -173,8 +173,8 @@ def set_collision_world(server, path_to_src, fixed_frame):
                     server.insert(int_marker, processFeedback)
                     if 'cartesian_path' in s and s['cartesian_path'] is not None:
                         path = cartesian_folder_path + s['cartesian_path']
-                        relative_waypoints = cartesian_path.read_cartesian_path(path)
-                        waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                        relative_waypoints = test_utils.read_cartesian_path(path)
+                        waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
                         dyn_obstacle_handles.append((int_marker.name, waypoints))
 
         if 'point_cloud' in env_collision: 
@@ -197,10 +197,10 @@ def set_collision_world(server, path_to_src, fixed_frame):
                     
                     int_marker = makeMarker(pc['name'], fixed_frame, "pcd", pc['translation'], pc['rotation'], [0.01, 0.01, 0.0], pc['is_dynamic'], points=points)
                     server.insert(int_marker, processFeedback)
-                    if 'cartesian_path' in s and s['cartesian_path'] is not None:
-                        path = cartesian_folder_path + s['cartesian_path']
-                        relative_waypoints = cartesian_path.read_cartesian_path(path)
-                        waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                    if 'cartesian_path' in pc and pc['cartesian_path'] is not None:
+                        path = cartesian_folder_path + pc['cartesian_path']
+                        relative_waypoints = test_utils.read_cartesian_path(path)
+                        waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
                         dyn_obstacle_handles.append((int_marker.name, waypoints))
         
         server.applyChanges()
@@ -243,6 +243,7 @@ def main(args=None):
 
     server = InteractiveMarkerServer("simple_marker")
     
+    dyn_obstacle_handles = []
     args = rospy.myargv(argv=sys.argv)
     if args[1] == "true": 
         dyn_obstacle_handles = set_collision_world(server, path_to_src, fixed_frame)
@@ -266,7 +267,7 @@ def main(args=None):
             updated = False
             for i, (name, waypoints) in enumerate(dyn_obstacle_handles):
                 if keyframes[i] < len(waypoints) - 1 - step:
-                    pose = cartesian_path.linear_interpolate(waypoints, keyframes[i])
+                    pose = test_utils.linear_interpolate(waypoints, keyframes[i])
                     server.setPose(name, pose)    
                     keyframes[i] += step
                     updated = True

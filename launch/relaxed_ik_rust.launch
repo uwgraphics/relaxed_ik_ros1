@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
 <launch>
-   <node pkg="relaxed_ik_ros1" type="relaxed_ik_rust.py" name="relaxed_ik" output="screen"/>
+   <arg name="input" default="cartesian_path"/>
+   <node pkg="relaxed_ik_ros1" type="relaxed_ik_rust.py" name="relaxed_ik" output="screen" args="$(arg input)"/>
 </launch>
