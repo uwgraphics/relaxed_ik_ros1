@@ -129,10 +129,10 @@ def main(args=None):
         dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
         angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
         while True:
-            # start = timer()
+            start = timer()
             xopt = lib.solve(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
-            # end = timer()
-            # print("Speed: {}".format(1.0 / (end - start)))
+            end = timer()
+            print("Speed: {}".format(1.0 / (end - start)))
 
             ja = JointAngles()
             for i in range(xopt.length):

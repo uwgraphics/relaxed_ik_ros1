@@ -15,11 +15,11 @@ import os
 import roslaunch
 import rospkg
 import rospy
-import sensor_msgs.point_cloud2 as pcl2
 import tf
 import transformations as T
 import yaml
 
+from geometry_msgs.msg import Point
 from interactive_markers.interactive_marker_server import *
 from relaxed_ik_ros1.msg import JointAngles
 from sensor_msgs.msg import JointState, PointCloud2, PointField
@@ -46,7 +46,7 @@ def is_point(pt):
             return False
     return True
 
-def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic):                
+def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=None):                
     int_marker = InteractiveMarker()
     int_marker.header.frame_id = fixed_frame
     int_marker.name = name
@@ -72,8 +72,11 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic):
     marker.color.a = 1.0
     if shape == "box":
         marker.type = Marker.CUBE
-    else:
+    elif shape == "sphere":
         marker.type = Marker.SPHERE
+    elif shape == "pcd":
+        marker.type = Marker.POINTS
+        marker.points = points
 
     control =  InteractiveMarkerControl()
     control.always_visible = True
@@ -109,7 +112,7 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic):
         my_control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
         int_marker.controls.append(my_control)
 
-        if shape == "box":
+        if shape != "sphere":
             rx_control = InteractiveMarkerControl()
             rx_control.orientation.w = c
             rx_control.orientation.x = c
@@ -146,67 +149,63 @@ def set_collision_world(server, path_to_src, fixed_frame):
         env_collision_file = open(env_collision_file_path, 'r')
         env_collision = yaml.load(env_collision_file)
         
-        dynamic_obstacle_path = []
-        points_msgs = []
+        dyn_obstacle_handles = []
+        cartesian_folder_path = rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/"
 
         if 'boxes' in env_collision: 
             planes = env_collision['boxes']
             if planes is not None:
-                for i, p in enumerate(planes):
+                for p in planes:
                     int_marker = makeMarker(p['name'], fixed_frame, "box", p['translation'], p['rotation'], p['parameters'], p['is_dynamic'])
                     server.insert(int_marker, processFeedback)
                     if 'cartesian_path' in p and p['cartesian_path'] is not None:
-                        path = rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/" + p['cartesian_path']
+                        path = cartesian_folder_path + p['cartesian_path']
                         relative_waypoints = cartesian_path.read_cartesian_path(path)
                         waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, int_marker.pose)
-                        dynamic_obstacle_path.append((int_marker.name, waypoints))
+                        dyn_obstacle_handles.append((int_marker.name, waypoints))
 
         if 'spheres' in env_collision:
             spheres = env_collision['spheres']
             if spheres is not None:
-                for i, s in enumerate(spheres):
+                for s in spheres:
                     radius = s['parameters']
                     int_marker = makeMarker(s['name'], fixed_frame, "sphere", s['translation'], [0, 0, 0], [radius, radius, radius], s['is_dynamic'])
                     server.insert(int_marker, processFeedback)
                     if 'cartesian_path' in s and s['cartesian_path'] is not None:
-                        path = rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/" + s['cartesian_path']
+                        path = cartesian_folder_path + s['cartesian_path']
                         relative_waypoints = cartesian_path.read_cartesian_path(path)
                         waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, int_marker.pose)
-                        dynamic_obstacle_path.append((int_marker.name, waypoints))
-        
-        server.applyChanges()
+                        dyn_obstacle_handles.append((int_marker.name, waypoints))
 
         if 'point_cloud' in env_collision: 
             point_cloud = env_collision['point_cloud']
             if point_cloud is not None:
                 for pc in point_cloud:
-                    scale = pc['scale']
-                    ts = pc['translation']
-                    rots = pc['rotation']
-
-                    header = Header()
-                    header.stamp = rospy.Time.now()
-                    header.frame_id = fixed_frame
-                    fields = [PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1), 
-                        PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
-                        PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1)]
-
                     pcd_path = path_to_src + '/env_collision_files/' + pc['file']
+                    scales = pc['scale']
                     points = []
                     with open(pcd_path, 'r') as point_cloud_file:
                         lines = point_cloud_file.read().split('\n')
                         for line in lines:
                             pt = line.split(' ')
                             if is_point(pt):
-                                pt_list = [float(pt[0]), float(pt[1]), float(pt[2]), 0.0]
-                                rot_mat = T.euler_matrix(rots[0], rots[1], rots[2])
-                                pt_rot = numpy.matmul(rot_mat, pt_list).tolist()
-                                pt_new = [scale[0]*pt_rot[0]+ts[0], scale[1]*pt_rot[1]+ts[1], scale[2]*pt_rot[2]+ts[2]]
-                                points.append(pt_new)
-
-                    points_msgs.append(pcl2.create_cloud(header, fields, points))
+                                point = Point()
+                                point.x = float(pt[0]) * scales[0]
+                                point.y = float(pt[1]) * scales[1]
+                                point.z = float(pt[2]) * scales[2]
+                                points.append(point)
+                    
+                    int_marker = makeMarker(pc['name'], fixed_frame, "pcd", pc['translation'], pc['rotation'], [0.01, 0.01, 0.0], pc['is_dynamic'], points=points)
+                    server.insert(int_marker, processFeedback)
+                    if 'cartesian_path' in s and s['cartesian_path'] is not None:
+                        path = cartesian_folder_path + s['cartesian_path']
+                        relative_waypoints = cartesian_path.read_cartesian_path(path)
+                        waypoints = cartesian_path.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                        dyn_obstacle_handles.append((int_marker.name, waypoints))
         
-        return (dynamic_obstacle_path, points_msgs)
+        server.applyChanges()
+
+        return dyn_obstacle_handles
 
 def main(args=None):
     rospy.init_node('rviz_viewer')
@@ -243,15 +242,14 @@ def main(args=None):
     launch.start()
 
     server = InteractiveMarkerServer("simple_marker")
-    pcl_pub = rospy.Publisher("/my_pcl_topic", PointCloud2, queue_size=10)
     
     args = rospy.myargv(argv=sys.argv)
     if args[1] == "true": 
-        (dynamic_obstacle_path, points_msgs) = set_collision_world(server, path_to_src, fixed_frame)
+        dyn_obstacle_handles = set_collision_world(server, path_to_src, fixed_frame)
 
     rate = rospy.Rate(300.0)
     prev_sol = starting_config
-    keyframe = [0] * len(dynamic_obstacle_path)
+    keyframes = [0] * len(dyn_obstacle_handles)
     step = 0.1
     initialized = False
     while not rospy.is_shutdown():
@@ -266,20 +264,15 @@ def main(args=None):
 
         if initialized:
             updated = False
-            for i, (name, waypoints) in enumerate(dynamic_obstacle_path):
-                if keyframe[i] < len(waypoints) - 1 - step:
-                    pose = cartesian_path.linear_interpolate(waypoints, keyframe[i])
+            for i, (name, waypoints) in enumerate(dyn_obstacle_handles):
+                if keyframes[i] < len(waypoints) - 1 - step:
+                    pose = cartesian_path.linear_interpolate(waypoints, keyframes[i])
                     server.setPose(name, pose)    
-                    keyframe[i] += step
+                    keyframes[i] += step
                     updated = True
 
             if updated:
                 server.applyChanges()
-
-        if len(points_msgs) > 0:
-            for msg in points_msgs:
-                msg.header.stamp = rospy.Time.now()
-                pcl_pub.publish(msg)
 
         if len(ja_solution) == 0:
             xopt = starting_config
