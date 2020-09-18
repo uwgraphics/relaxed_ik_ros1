@@ -267,7 +267,7 @@ def main(args=None):
             updated = False
             for i, (name, waypoints) in enumerate(dyn_obstacle_handles):
                 if keyframes[i] < len(waypoints) - 1 - step:
-                    pose = test_utils.linear_interpolate(waypoints, keyframes[i])
+                    pose = test_utils.linear_interpolate_waypoints(waypoints, keyframes[i])
                     server.setPose(name, pose)    
                     keyframes[i] += step
                     updated = True

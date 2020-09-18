@@ -110,7 +110,7 @@ def main(args=None):
         rot_cur = init_rot
         rate = rospy.Rate(300)
         while not rospy.is_shutdown():
-            p = test_utils.linear_interpolate(waypoints, keyframe)
+            p = test_utils.linear_interpolate_waypoints(waypoints, keyframe)
             pos_arr = (ctypes.c_double * 3)()
             quat_arr = (ctypes.c_double * 4)()
 
@@ -158,7 +158,7 @@ def main(args=None):
 
         # print(ja_stream)
         print("\nSize of the joint state stream: {}".format(len(ja_stream)))
-    
+  
     elif args[1] == "keyboard":
         global eepg
         rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, eePoseGoals_cb)

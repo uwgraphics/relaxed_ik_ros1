@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import math
+import numpy
 import transformations as T
 from geometry_msgs.msg import Pose
 
@@ -46,7 +46,7 @@ def get_abs_waypoints(relative_waypoints, init_pose):
 
     return waypoints
 
-def linear_interpolate(waypoints, keyframe):
+def linear_interpolate_waypoints(waypoints, keyframe):
     if keyframe < 0 or keyframe > len(waypoints) - 1:
         return
 
@@ -71,3 +71,62 @@ def linear_interpolate(waypoints, keyframe):
     wpose.orientation.z = q[3]
 
     return wpose
+
+def linear_interpolate_joint_states(ja_stream_list, output_size):
+    if output_size == len(ja_stream_list): return ja_stream_list
+    ja_stream = numpy.array(ja_stream_list)
+    new_ja_stream = []
+    if output_size > len(ja_stream):
+        ja_per_interval = (output_size - len(ja_stream)) / (len(ja_stream) - 1)
+        ja_extra = (output_size - len(ja_stream)) % (len(ja_stream) - 1)
+        for i, ja in enumerate(ja_stream):
+            if i == 0: 
+                new_ja_stream.append(list(ja))
+                continue
+            add_ja_number = ja_per_interval
+            if i <= ja_extra:
+                add_ja_number += 1
+            for j in range(add_ja_number):
+                step = (ja - ja_stream[i - 1]) * float(j + 1) / float(add_ja_number + 1)
+                new_ja_stream.append(list(ja_stream[i - 1] + step))
+            new_ja_stream.append(list(ja))
+    else:
+        ja_per_interval = (len(ja_stream) - output_size) / (output_size - 1)
+        ja_extra = (len(ja_stream) - output_size) % (output_size - 1)
+        i = 0
+        while i < len(ja_stream):
+            print(i)
+            new_ja_stream.append(list(ja_stream[i]))
+            if i < ja_extra:
+                i += ja_per_interval + 2
+            else:
+                i += ja_per_interval + 1
+
+    print(len(ja_stream), len(new_ja_stream))
+    return new_ja_stream
+
+def benchmark_evaluate(ja_stream_list):
+    ja_stream = numpy.array(ja_stream_list)
+    v_sum = 0.0
+    a_sum = 0.0
+    jerk_sum = 0.0
+    for i, x in enumerate(ja_stream):
+        if i == 0: continue
+        v1 = x - ja_stream[i-1]
+        if i == 1:
+            v_sum += v1
+            continue
+        v2 = ja_stream[i-1] - ja_stream[i-2]
+        a1 = v2 - v1
+        if i == 2:
+            a_sum += a1
+            continue
+        v3 = ja_stream[i-2] - ja_stream[i-3]
+        a2 = v3 - v2
+        jerk_sum += a2 - a1
+    
+    v_aver = v_sum / (len(ja_stream) - 1)
+    a_aver = a_sum / (len(ja_stream) - 2)
+    jerk_aver = jerk_sum / (len(ja_stream) - 3)
+    
+    print(v_aver, a_aver, jerk_aver)

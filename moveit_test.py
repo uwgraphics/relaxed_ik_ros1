@@ -180,7 +180,7 @@ def main(args=None):
     rate = rospy.Rate(300)
     while not rospy.is_shutdown():
         # print(keyframe)
-        p = test_utils.linear_interpolate(waypoints, keyframe)
+        p = test_utils.linear_interpolate_waypoints(waypoints, keyframe)
         move_group.set_pose_target(p)
 
         # start = timer()
