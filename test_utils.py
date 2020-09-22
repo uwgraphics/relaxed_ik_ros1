@@ -4,6 +4,16 @@ import numpy
 import transformations as T
 from geometry_msgs.msg import Pose
 
+def is_point(pt):
+    if len(pt) < 3:
+        return False
+    for e in pt:
+        try:
+            float(e)
+        except ValueError:
+            return False
+    return True
+    
 def read_cartesian_path(filename):
     file = open(filename, 'r')
     lines = file.readlines()

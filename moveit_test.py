@@ -33,8 +33,8 @@ def marker_update_cb(msg, scene):
     collison_objects = []
     poses = []
     for pose_stamped in msg.poses:
-        collison_objects.append(scene.get_objects([pose_stamped.name])[pose_stamped.name])
-        poses.append(pose_stamped.pose)
+            collison_objects.append(scene.get_objects([pose_stamped.name])[pose_stamped.name])
+            poses.append(pose_stamped.pose)
     update_collision_object(collison_objects, poses)
 
 def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale, is_dynamic, filename=''):
@@ -54,7 +54,33 @@ def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale,
     elif shape == 'sphere':
         scene.add_sphere(name, p, scale[0])
     elif shape == 'pcd':
-        scene.add_mesh(name, p, filename, size=scale)
+        pass
+        # with open(filename, 'r') as point_cloud_file:
+        #     pt_index = 0
+        #     lines = point_cloud_file.read().split('\n')
+        #     for line in lines:
+        #         pt = line.split(' ')
+        #         if test_utils.is_point(pt):
+        #             s = PoseStamped()
+        #             s.header.frame_id = planning_frame
+
+        #             pt_list = [float(pt[0]), float(pt[1]), float(pt[2]), 0.0]
+        #             rot_mat = T.euler_matrix(rots[0], rots[1], rots[2])
+        #             pt_rot = numpy.matmul(rot_mat, pt_list).tolist()
+
+        #             s.pose.position.x = scale[0] * pt_rot[0] + trans[0]
+        #             s.pose.position.y = scale[1] * pt_rot[1] + trans[1]
+        #             s.pose.position.z = scale[2] * pt_rot[2] + trans[2]
+
+        #             s.pose.orientation.w = 1.0
+        #             s.pose.orientation.x = 0.0
+        #             s.pose.orientation.y = 0.0
+        #             s.pose.orientation.z = 0.0
+
+        #             scene.add_sphere(name + "_pt" + str(pt_index), s, 0.001)
+        #             pt_index += 1
+    elif shape == "mesh":
+        scene.add_mesh(name, p, filename, size=(0.02 * scale[0], 0.02 * scale[0], 0.02 * scale[0]))
 
     print(name)
 
@@ -112,17 +138,13 @@ def set_collision_world(robot, scene):
                 for pc in point_cloud:
                     pcd_path = path_to_src + '/env_collision_files/' + pc['file']
                     add_collision_object(scene, pc['name'], planning_frame, "pcd", pc['translation'], pc['rotation'], pc['scale'], pc['is_dynamic'], filename=pcd_path)
-                    # points = []
-                    # with open(pcd_path, 'r') as point_cloud_file:
-                    #     lines = point_cloud_file.read().split('\n')
-                    #     for line in lines:
-                    #         pt = line.split(' ')
-                    #         if is_point(pt):
-                    #             point = Point()
-                    #             point.x = float(pt[0]) * scales[0]
-                    #             point.y = float(pt[1]) * scales[1]
-                    #             point.z = float(pt[2]) * scales[2]
-                    #             points.append(point)
+
+        if 'tri_mesh' in env_collision: 
+            tri_mesh = env_collision['tri_mesh']
+            if tri_mesh is not None:
+                for m in tri_mesh:
+                    mesh_path = path_to_src + '/env_collision_files/' + m['file']
+                    add_collision_object(scene, m['name'], planning_frame, "mesh", m['translation'], m['rotation'], m['parameters'], m['is_dynamic'], filename=mesh_path)
 
 def main(args=None):
     print("\nMoveIt initialized!")
@@ -213,6 +235,8 @@ def main(args=None):
                 
                 move_group.execute(plan)
                 keyframe += step
+            else:
+                print("Planned pose is not close enough!")
 
         if round(keyframe) >= len(waypoints) - 1: break
 

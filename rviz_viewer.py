@@ -36,17 +36,7 @@ def processFeedback(feedback):
     p = feedback.pose.position
     print (feedback.marker_name + " is now at " + str(p.x) + ", " + str(p.y) + ", " + str(p.z))
 
-def is_point(pt):
-    if len(pt) < 3:
-        return False
-    for e in pt:
-        try:
-            float(e)
-        except ValueError:
-            return False
-    return True
-
-def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=None):                
+def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=None, mesh_file=None):                
     int_marker = InteractiveMarker()
     int_marker.header.frame_id = fixed_frame
     int_marker.name = name
@@ -77,6 +67,9 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=Non
     elif shape == "pcd":
         marker.type = Marker.POINTS
         marker.points = points
+    elif shape == "mesh":
+        marker.type = Marker.MESH_RESOURCE
+        marker.mesh_resource = mesh_file
 
     control =  InteractiveMarkerControl()
     control.always_visible = True
@@ -188,7 +181,7 @@ def set_collision_world(server, path_to_src, fixed_frame):
                         lines = point_cloud_file.read().split('\n')
                         for line in lines:
                             pt = line.split(' ')
-                            if is_point(pt):
+                            if test_utils.is_point(pt):
                                 point = Point()
                                 point.x = float(pt[0]) * scales[0]
                                 point.y = float(pt[1]) * scales[1]
@@ -203,6 +196,19 @@ def set_collision_world(server, path_to_src, fixed_frame):
                         waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
                         dyn_obstacle_handles.append((int_marker.name, waypoints))
         
+        if 'tri_mesh' in env_collision:
+            tri_meshes = env_collision['tri_mesh']
+            if tri_meshes is not None:
+                for m in tri_meshes:
+                    mesh_path = 'package://relaxed_ik_ros1/env_collision_files/' + m['file']
+                    int_marker = makeMarker(m['name'], fixed_frame, "mesh", m['translation'], m['rotation'], m['parameters'], m['is_dynamic'], mesh_file=mesh_path)
+                    server.insert(int_marker, processFeedback)
+                    if 'cartesian_path' in m and m['cartesian_path'] is not None:
+                        path = cartesian_folder_path + m['cartesian_path']
+                        relative_waypoints = test_utils.read_cartesian_path(path)
+                        waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                        dyn_obstacle_handles.append((int_marker.name, waypoints))
+
         server.applyChanges()
 
         return dyn_obstacle_handles
