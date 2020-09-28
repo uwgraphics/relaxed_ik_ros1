@@ -39,15 +39,6 @@ def marker_update_cb(msg, scene):
     collison_objects = []
     poses = []
     for pose_stamped in msg.poses:
-        # if pose_stamped.name == "bunny":
-        #     pt_names = []
-        #     for i in range(30571):
-        #         pt_names.append("bunny" + "_pt" + str(i))
-        #     objects = scene.get_objects(pt_names).values()
-        #     for o in objects:
-        #         collison_objects.append(o)
-        #         poses.append(pose_stamped.pose)
-        # else:
         collison_objects.append(scene.get_objects([pose_stamped.name])[pose_stamped.name])
         poses.append(pose_stamped.pose)
     update_collision_object(collison_objects, poses)
@@ -69,71 +60,40 @@ def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale,
     elif shape == 'sphere':
         scene.add_sphere(name, p, scale[0])
     elif shape == 'pcd':
-        # pass
+        point_cloud = numpy.loadtxt(filename, skiprows=1)
+        pcd = open3d.geometry.PointCloud()
+        pcd.points = open3d.utility.Vector3dVector(point_cloud[:,:3])
+        # open3d.visualization.draw_geometries([pcd])
+        convex_hull = pcd.compute_convex_hull()[0]
+        # open3d.visualization.draw_geometries([convex_hull])
+
         co = CollisionObject()
         co.operation = CollisionObject.ADD
         co.id = name
         co.header = p.header
 
         mesh = Mesh()
-        # first_face = scene.meshes[0].faces[0]
-        # if hasattr(first_face, '__len__'):
-        #     for face in scene.meshes[0].faces:
-        #         if len(face) == 3:
-        #             triangle = MeshTriangle()
-        #             triangle.vertex_indices = [face[0], face[1], face[2]]
-        #             mesh.triangles.append(triangle)
-        # elif hasattr(first_face, 'indices'):
-        #     for face in scene.meshes[0].faces:
-        #         if len(face.indices) == 3:
-        #             triangle = MeshTriangle()
-        #             triangle.vertex_indices = [face.indices[0],
-        #                                        face.indices[1],
-        #                                        face.indices[2]]
-        #             mesh.triangles.append(triangle)
-        # else:
-        #     raise MoveItCommanderException("Unable to build triangles from mesh due to mesh object structure")
+        for face in convex_hull.triangles:
+            triangle = MeshTriangle()
+            triangle.vertex_indices = [face[0], face[1], face[2]]
+            mesh.triangles.append(triangle)
 
-        with open(filename, 'r') as point_cloud_file:
-            # pt_index = 0
-            lines = point_cloud_file.read().split('\n')
-            for line in lines:
-                pt = line.split(' ')
-                if test_utils.is_point(pt):
-                    # s = PoseStamped()
-                    # s.header.frame_id = planning_frame
-
-                    # pt_list = [float(pt[0]), float(pt[1]), float(pt[2]), 0.0]
-                    # rot_mat = T.euler_matrix(rots[0], rots[1], rots[2])
-                    # pt_rot = numpy.matmul(rot_mat, pt_list).tolist()
-
-                    # s.pose.position.x = scale[0] * pt_rot[0] + trans[0]
-                    # s.pose.position.y = scale[1] * pt_rot[1] + trans[1]
-                    # s.pose.position.z = scale[2] * pt_rot[2] + trans[2]
-
-                    # s.pose.orientation.w = 1.0
-                    # s.pose.orientation.x = 0.0
-                    # s.pose.orientation.y = 0.0
-                    # s.pose.orientation.z = 0.0
-                    point = Point()
-                    point.x = float(pt[0]) * scale[0]
-                    point.y = float(pt[1]) * scale[1]
-                    point.z = float(pt[2]) * scale[2]
-                    mesh.vertices.append(point)
-
-                    # scene.add_sphere(name + "_pt" + str(pt_index), s, 0.001)
-                    # pt_index += 1
+        for vertex in convex_hull.vertices:
+            point = Point()
+            point.x = vertex[0] * scale[0]
+            point.y = vertex[1] * scale[1]
+            point.z = vertex[2] * scale[2]
+            mesh.vertices.append(point)
         
         co.meshes = [mesh]
         co.mesh_poses = [p.pose]
         submit([co], True)
-
     elif shape == "mesh":
         scene.add_mesh(name, p, filename, size=(0.02 * scale[0], 0.02 * scale[0], 0.02 * scale[0]))
 
     print(name)
 
-def update_collision_object(collison_objects, new_poses, synchronous=True):
+def update_collision_object(collison_objects, new_poses, synchronous=False):
     new_co = []
     for i, old_co in enumerate(collison_objects):
         co = CollisionObject()
@@ -147,7 +107,7 @@ def update_collision_object(collison_objects, new_poses, synchronous=True):
     submit(new_co, synchronous)
 
 def submit(new_co, synchronous):
-    print(new_co)
+    # print(new_co)
     if synchronous:
         scene = PlanningScene()
         scene.is_diff = True

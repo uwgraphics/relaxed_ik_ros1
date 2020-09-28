@@ -14,22 +14,22 @@ spheres:
   - name: sphere1
     parameters: 0.1
     is_dynamic: 1
-    # cartesian_path: cartesian_path_prototype
+    cartesian_path: cartesian_path_prototype
     translation: [0.4,0.5,0.25]
   - name: sphere2
     parameters: 0.15
     is_dynamic: 1
-    # cartesian_path: cartesian_path_prototype
+    cartesian_path: cartesian_path_prototype
     translation: [0.3,-0.5,0.3]
   - name: sphere3
     parameters: 0.12
     is_dynamic: 1
-    # cartesian_path: cartesian_path_prototype
+    cartesian_path: cartesian_path_prototype
     translation: [0.85,0.15,0.3]
   - name: sphere4
     parameters: 0.06
     is_dynamic: 1
-    # cartesian_path: cartesian_path_prototype
+    cartesian_path: cartesian_path_prototype
     translation: [0.6,-0.1,0.8]
 point_cloud:
   # - name: sphere_list1
@@ -49,10 +49,10 @@ point_cloud:
   - name: bunny
     parameters: 0.001
     is_dynamic: 1
-    # cartesian_path: cartesian_path_prototype
+    cartesian_path: cartesian_path_prototype
     scale: [2.0,2.0,2.0]
     rotation: [1.57,0.0,-1.57]
-    translation: [1.5,-0.25,0.15]
+    translation: [1.0,-0.25,0.15]
     file: bunnyData.pts
 # tri_mesh:
 #   - name: cat
