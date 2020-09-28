@@ -158,6 +158,7 @@ def main(args=None):
 
         # print(ja_stream)
         print("\nSize of the joint state stream: {}".format(len(ja_stream)))
+        test_utils.benchmark_evaluate(ja_stream)
   
     elif args[1] == "keyboard":
         global eepg

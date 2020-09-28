@@ -19,6 +19,7 @@ import tf
 import transformations as T
 import yaml
 
+from std_msgs.msg import ColorRGBA
 from geometry_msgs.msg import Point
 from interactive_markers.interactive_marker_server import *
 from relaxed_ik_ros1.msg import JointAngles
@@ -31,6 +32,12 @@ def ja_solution_cb(data):
     ja_solution = []
     for a in data.angles.data:
         ja_solution.append(a)
+
+def marker_feedback_cb(msg, args):
+    # update dynamic collision obstacles in relaxed IK
+    server = args
+    server.setPose(msg.marker_name, msg.pose)    
+    server.applyChanges()
 
 def processFeedback(feedback):
     p = feedback.pose.position
@@ -67,6 +74,12 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=Non
     elif shape == "pcd":
         marker.type = Marker.POINTS
         marker.points = points
+        # color = ColorRGBA()
+        # color.r = 0.0
+        # color.g = 0.0
+        # color.b = 1.0
+        # color.a = 1.0
+        # marker.colors = [color] * len(points)
     elif shape == "mesh":
         marker.type = Marker.MESH_RESOURCE
         marker.mesh_resource = mesh_file
@@ -248,6 +261,7 @@ def main(args=None):
     launch.start()
 
     server = InteractiveMarkerServer("simple_marker")
+    rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, marker_feedback_cb, server)
     
     dyn_obstacle_handles = []
     args = rospy.myargv(argv=sys.argv)

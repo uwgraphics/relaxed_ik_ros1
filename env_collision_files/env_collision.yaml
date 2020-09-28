@@ -46,19 +46,19 @@ point_cloud:
   #   rotation: [0.0,0.0,1.57]
   #   translation: [1.0,0.6,0.0]
   #   file: spheres.pcd
-  # - name: bunny
-  #   parameters: 0.001
-  #   is_dynamic: 1
-  #   cartesian_path: cartesian_path_prototype
-  #   scale: [2.0,2.0,2.0]
-  #   rotation: [1.57,0.0,-1.57]
-  #   translation: [1.5,-0.25,0.15]
-  #   file: bunnyData.pts
-tri_mesh:
-  - name: cat
-    parameters: [0.05,0.05,0.05]
+  - name: bunny
+    parameters: 0.001
     is_dynamic: 1
-    cartesian_path: cartesian_path_prototype
-    rotation: [0.0,0.0,0.0]
-    translation: [0.8,-0.25,0.15]
-    file: cat.dae
+    # cartesian_path: cartesian_path_prototype
+    scale: [2.0,2.0,2.0]
+    rotation: [1.57,0.0,-1.57]
+    translation: [1.5,-0.25,0.15]
+    file: bunnyData.pts
+# tri_mesh:
+#   - name: cat
+#     parameters: [0.05,0.05,0.05]
+#     is_dynamic: 1
+#     cartesian_path: cartesian_path_prototype
+#     rotation: [0.0,0.0,0.0]
+#     translation: [0.8,-0.25,0.15]
+#     file: cat.dae
