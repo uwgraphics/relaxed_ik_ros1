@@ -24,6 +24,7 @@ from geometry_msgs.msg import Point
 from interactive_markers.interactive_marker_server import *
 from relaxed_ik_ros1.msg import JointAngles
 from sensor_msgs.msg import JointState, PointCloud2, PointField
+from timeit import default_timer as timer
 from visualization_msgs.msg import *
 
 ja_solution = ''
@@ -268,11 +269,12 @@ def main(args=None):
     if args[1] == "true": 
         dyn_obstacle_handles = set_collision_world(server, path_to_src, fixed_frame)
 
-    rate = rospy.Rate(300.0)
+    rate = rospy.Rate(3000)
     prev_sol = starting_config
-    keyframes = [0] * len(dyn_obstacle_handles)
-    step = 0.1
+    keyframes = [0.0] * len(dyn_obstacle_handles)
+    step = 1.0
     initialized = False
+    motion_start = timer()
     while not rospy.is_shutdown():
         tf_pub.sendTransform((0, 0, 0),tf.transformations.quaternion_from_euler(0, 0, 0),
             rospy.Time.now(), 'common_world', fixed_frame)
@@ -282,15 +284,19 @@ def main(args=None):
             initialized = param == "go"
         except KeyError:
             initialized = False
+            motion_start = timer()
 
         if initialized:
             updated = False
             for i, (name, waypoints) in enumerate(dyn_obstacle_handles):
-                if keyframes[i] < len(waypoints) - 1 - step:
-                    pose = test_utils.linear_interpolate_waypoints(waypoints, keyframes[i])
-                    server.setPose(name, pose)    
-                    keyframes[i] += step
-                    updated = True
+                if keyframes[i] < len(waypoints):
+                    (time, pose) = test_utils.linear_interpolate_waypoints(waypoints, keyframes[i])
+                    time_elapsed = timer() - motion_start
+                    # print("Planned time: {}, time elapsed: {}".format(time, time_elapsed))
+                    if time_elapsed >= time:
+                        server.setPose(name, pose)
+                        updated = True
+                        keyframes[i] += step
 
             if updated:
                 server.applyChanges()

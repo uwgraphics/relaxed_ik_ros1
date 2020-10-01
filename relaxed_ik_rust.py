@@ -103,14 +103,17 @@ def main(args=None):
 
         ja_stream = []
         keyframe = 0.0
-        step = 0.1
+        step = 1.0
         pos_goal_tolerance = 0.01
         quat_goal_tolerance = 0.01
         trans_cur = init_trans
         rot_cur = init_rot
-        rate = rospy.Rate(300)
+        rate = rospy.Rate(3000)
+
+        motion_time = waypoints[-1][0] - waypoints[0][0]
+        motion_start = timer()
         while not rospy.is_shutdown():
-            p = test_utils.linear_interpolate_waypoints(waypoints, keyframe)
+            (time, p) = test_utils.linear_interpolate_waypoints(waypoints, keyframe)
             pos_arr = (ctypes.c_double * 3)()
             quat_arr = (ctypes.c_double * 4)()
 
@@ -132,10 +135,8 @@ def main(args=None):
             for i in range(xopt.length):
                 ja.angles.data.append(xopt.data[i])
             angles_pub.publish(ja)
-            
             # print(ja.angles.data)
-            ja_stream.append(ja.angles.data)
-
+            
             pose = kdl_kin.forward(ja.angles.data)
             trans_cur = [pose[0,3], pose[1,3], pose[2,3]]
             rot_cur = T.quaternion_from_matrix(pose)
@@ -149,17 +150,28 @@ def main(args=None):
             angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
             # print(dis, angle_between)
 
-            if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance and keyframe < len(waypoints) - 1 - step:
-                keyframe += step
-
-            if round(keyframe) >= len(waypoints) - 1: break
-
+            time_elapsed = timer() - motion_start
+            if time_elapsed > 2.0 * motion_time:
+                print("\nThe motion is planned to take {} seconds and in practice it takes {} seconds".format(motion_time, time_elapsed))
+                break
+            
+            if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance:
+                if time_elapsed >= time:
+                    ja_stream.append(ja.angles.data)
+                    if keyframe < len(waypoints) - 1: 
+                        keyframe += step
+                    else:
+                        print("\nThe motion is planned to take {} seconds and in practice it takes {} seconds".format(motion_time, time_elapsed))
+                        break
+            else:
+                ja_stream.append(ja.angles.data)
+                
             rate.sleep()
 
+        print("Size of the joint state stream: {}".format(len(ja_stream)))
         # print(ja_stream)
-        print("\nSize of the joint state stream: {}".format(len(ja_stream)))
-        test_utils.benchmark_evaluate(ja_stream)
-  
+        test_utils.benchmark_evaluate(ja_stream, 0.1)
+
     elif args[1] == "keyboard":
         global eepg
         rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, eePoseGoals_cb)

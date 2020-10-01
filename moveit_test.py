@@ -208,10 +208,13 @@ def main(args=None):
     quat_goal_tolerance = 0.01
     trans_cur = [init_pose.position.x, init_pose.position.y, init_pose.position.z]
     rot_cur = [init_pose.orientation.w, init_pose.orientation.x, init_pose.orientation.y, init_pose.orientation.z]
-    rate = rospy.Rate(300)
+    rate = rospy.Rate(3000)
+
+    motion_time = waypoints[-1][0] - waypoints[0][0]
+    motion_start = timer()
     while not rospy.is_shutdown():
         # print(keyframe)
-        p = test_utils.linear_interpolate_waypoints(waypoints, keyframe)
+        (time, p) = test_utils.linear_interpolate_waypoints(waypoints, keyframe)
         move_group.set_pose_target(p)
 
         # start = timer()
@@ -219,6 +222,11 @@ def main(args=None):
         # end = timer()
         # print("Speed: {}".format(1.0 / (end - start)))
         
+        time_elapsed = timer() - motion_start
+        if time_elapsed > 20.0 * motion_time:
+            print("\nThe motion is planned to take {} seconds and in practice it takes {} seconds".format(motion_time, time_elapsed))
+            break
+
         if len(plan.joint_trajectory.points) > 0:
             ja_list = list(plan.joint_trajectory.points[-1].positions)
             
@@ -235,19 +243,22 @@ def main(args=None):
             angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
             # print(dis, angle_between)
 
-            if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance and keyframe < len(waypoints) - 1:
-                ja = JointAngles()
-                ja.angles.data = ja_list
-                angles_pub.publish(ja)
+            if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance:
+                if time_elapsed >= time:
+                    ja = JointAngles()
+                    ja.angles.data = ja_list
+                    angles_pub.publish(ja)
+                    ja_stream.append(ja_list)
+                    move_group.execute(plan)
 
-                ja_stream.append(ja_list)
-                
-                move_group.execute(plan)
-                keyframe += step
+                    if keyframe < len(waypoints) - 1:
+                        keyframe += step
+                    else:
+                        print("\nThe motion is planned to take {} seconds and in practice it takes {} seconds".format(motion_time, time_elapsed))
+                        break
             else:
+                ja_stream.append(ja_list)
                 print("Planned pose is not close enough!")
-
-        if round(keyframe) >= len(waypoints) - 1: break
 
         rate.sleep()
 
