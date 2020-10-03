@@ -38,12 +38,12 @@ cur_time = 0.0
 def time_update_cb(msg):
     global cur_time
     cur_time = msg.data
+    print("The current time is {}".format(cur_time))
 
-def marker_feedback_cb(msg, args):
-    # update dynamic collision obstacles in relaxed IK
-    server = args
-    server.setPose(msg.marker_name, msg.pose)    
-    server.applyChanges()
+# def marker_feedback_cb(msg, args):
+#     server = args
+#     server.setPose(msg.marker_name, msg.pose)    
+#     server.applyChanges()
 
 def processFeedback(feedback):
     p = feedback.pose.position
@@ -80,12 +80,6 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=Non
     elif shape == "pcd":
         marker.type = Marker.POINTS
         marker.points = points
-        # color = ColorRGBA()
-        # color.r = 0.0
-        # color.g = 0.0
-        # color.b = 1.0
-        # color.a = 1.0
-        # marker.colors = [color] * len(points)
     elif shape == "mesh":
         marker.type = Marker.MESH_RESOURCE
         marker.mesh_resource = mesh_file
@@ -267,7 +261,7 @@ def main(args=None):
     launch.start()
 
     server = InteractiveMarkerServer("simple_marker")
-    rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, marker_feedback_cb, server)
+    # rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, marker_feedback_cb, server)
 
     rospy.Subscriber('/relaxed_ik/current_time', Float64, time_update_cb)
     
@@ -276,14 +270,11 @@ def main(args=None):
     if args[1] == "true": 
         dyn_obstacle_handles = set_collision_world(server, path_to_src, fixed_frame)
 
-    rate = rospy.Rate(3000)
     prev_sol = starting_config
-    # goals = [0] * len(dyn_obstacle_handles)
-    # cur_time = [0.0] * len(dyn_obstacle_handles)
     delta_time = 0.01
-    # step = 1.0
     initialized = False
-    # motion_start = timer()
+
+    rate = rospy.Rate(3000)
     while not rospy.is_shutdown():
         tf_pub.sendTransform((0, 0, 0),tf.transformations.quaternion_from_euler(0, 0, 0),
             rospy.Time.now(), 'common_world', fixed_frame)
@@ -293,22 +284,14 @@ def main(args=None):
             initialized = param == "go"
         except KeyError:
             initialized = False
-            # motion_start = timer()
 
         if initialized:
             updated = False
             for (name, waypoints) in dyn_obstacle_handles:
                 if cur_time < len(waypoints) * delta_time:
-                    print(cur_time)
-                    # if goals[i] < len(waypoints):
                     (time, pose) = test_utils.linear_interpolate_waypoints(waypoints, int(cur_time / delta_time))
-                    # time_elapsed = timer() - motion_start
-                    # print("Planned time: {}, time elapsed: {}".format(time, time_elapsed))
                     server.setPose(name, pose)
                     updated = True
-                    # if goals[i] < len(waypoints) - 1:
-                    #     goals[i] += 1
-                    # cur_time[i] += delta_time
 
             if updated:
                 server.applyChanges()

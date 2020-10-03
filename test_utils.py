@@ -13,6 +13,11 @@ def is_point(pt):
         except ValueError:
             return False
     return True
+
+def get_ee_link(info_file_name):
+    name = info_file_name.split('_')[0]
+    ee_dict = {"ur5": ["ee_link"], "iiwa7": ["iiwa_link_ee"], "jaco7": ["j2s7s300_end_effector"]}
+    return ee_dict.get(name)
     
 def read_cartesian_path(filename):
     file = open(filename, 'r')
@@ -58,10 +63,8 @@ def get_abs_waypoints(relative_waypoints, init_pose):
     return waypoints
 
 def linear_interpolate_waypoints(waypoints, keyframe):
-    if keyframe < 0 or keyframe > len(waypoints) - 1:
-        return
-    if keyframe == len(waypoints) - 1:
-        return waypoints[int(keyframe)]
+    if keyframe >= len(waypoints) - 1:
+        return waypoints[-1]
 
     floor = int(keyframe)
     # if (keyframe - floor == 0.0):

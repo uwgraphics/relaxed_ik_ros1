@@ -62,120 +62,90 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        controller_box:
+        j2s7s300_end_effector:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        head:
+        j2s7s300_link_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        head_camera:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        pedestal:
+        j2s7s300_link_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        pedestal_feet:
+        j2s7s300_link_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_arm_base_link:
+        j2s7s300_link_4:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_arm_itb:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        right_hand:
+        j2s7s300_link_5:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_hand_camera:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        right_l0:
+        j2s7s300_link_6:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_l1:
+        j2s7s300_link_7:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_l1_2:
+        j2s7s300_link_base:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_l2:
+        j2s7s300_link_finger_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_l2_2:
+        j2s7s300_link_finger_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_l3:
+        j2s7s300_link_finger_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_l4:
+        j2s7s300_link_finger_tip_1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_l4_2:
+        j2s7s300_link_finger_tip_2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_l5:
+        j2s7s300_link_finger_tip_3:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_l6:
+        root:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_torso_itb:
+        world:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        right_wrist:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        screen:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        torso:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
@@ -183,108 +153,19 @@ Visualization Manager:
       Value: true
       Visual Enabled: true
     - Class: rviz/TF
-      Enabled: true
+      Enabled: false
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        base:
-          Value: true
-        common_world:
-          Value: true
-        controller_box:
-          Value: true
-        head:
-          Value: true
-        head_camera:
-          Value: true
-        pedestal:
-          Value: true
-        pedestal_feet:
-          Value: true
-        right_arm_base_link:
-          Value: true
-        right_arm_itb:
-          Value: true
-        right_hand:
-          Value: true
-        right_hand_camera:
-          Value: true
-        right_l0:
-          Value: true
-        right_l1:
-          Value: true
-        right_l1_2:
-          Value: true
-        right_l2:
-          Value: true
-        right_l2_2:
-          Value: true
-        right_l3:
-          Value: true
-        right_l4:
-          Value: true
-        right_l4_2:
-          Value: true
-        right_l5:
-          Value: true
-        right_l6:
-          Value: true
-        right_torso_itb:
-          Value: true
-        right_wrist:
-          Value: true
-        screen:
-          Value: true
-        torso:
-          Value: true
       Marker Scale: 0.20000000298023224
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        base:
-          common_world:
-            {}
-          controller_box:
-            {}
-          pedestal:
-            {}
-          pedestal_feet:
-            {}
-          right_arm_base_link:
-            right_l0:
-              head:
-                head_camera:
-                  {}
-                screen:
-                  {}
-              right_l1:
-                right_l1_2:
-                  {}
-                right_l2:
-                  right_l2_2:
-                    {}
-                  right_l3:
-                    right_l4:
-                      right_arm_itb:
-                        {}
-                      right_l4_2:
-                        {}
-                      right_l5:
-                        right_hand_camera:
-                          {}
-                        right_l6:
-                          right_hand:
-                            {}
-                        right_wrist:
-                          {}
-              right_torso_itb:
-                {}
-          torso:
-            {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
     - Class: rviz/Marker
       Enabled: true
       Marker Topic: /visualization_marker
