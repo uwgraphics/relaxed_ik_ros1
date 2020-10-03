@@ -19,7 +19,7 @@ import tf
 import transformations as T
 import yaml
 
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA, Float64
 from geometry_msgs.msg import Point
 from interactive_markers.interactive_marker_server import *
 from relaxed_ik_ros1.msg import JointAngles
@@ -33,6 +33,11 @@ def ja_solution_cb(data):
     ja_solution = []
     for a in data.angles.data:
         ja_solution.append(a)
+
+cur_time = 0.0
+def time_update_cb(msg):
+    global cur_time
+    cur_time = msg.data
 
 def marker_feedback_cb(msg, args):
     # update dynamic collision obstacles in relaxed IK
@@ -263,6 +268,8 @@ def main(args=None):
 
     server = InteractiveMarkerServer("simple_marker")
     rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, marker_feedback_cb, server)
+
+    rospy.Subscriber('/relaxed_ik/current_time', Float64, time_update_cb)
     
     dyn_obstacle_handles = []
     args = rospy.myargv(argv=sys.argv)
@@ -271,10 +278,12 @@ def main(args=None):
 
     rate = rospy.Rate(3000)
     prev_sol = starting_config
-    keyframes = [0.0] * len(dyn_obstacle_handles)
-    step = 1.0
+    # goals = [0] * len(dyn_obstacle_handles)
+    # cur_time = [0.0] * len(dyn_obstacle_handles)
+    delta_time = 0.01
+    # step = 1.0
     initialized = False
-    motion_start = timer()
+    # motion_start = timer()
     while not rospy.is_shutdown():
         tf_pub.sendTransform((0, 0, 0),tf.transformations.quaternion_from_euler(0, 0, 0),
             rospy.Time.now(), 'common_world', fixed_frame)
@@ -284,19 +293,22 @@ def main(args=None):
             initialized = param == "go"
         except KeyError:
             initialized = False
-            motion_start = timer()
+            # motion_start = timer()
 
         if initialized:
             updated = False
-            for i, (name, waypoints) in enumerate(dyn_obstacle_handles):
-                if keyframes[i] < len(waypoints):
-                    (time, pose) = test_utils.linear_interpolate_waypoints(waypoints, keyframes[i])
-                    time_elapsed = timer() - motion_start
+            for (name, waypoints) in dyn_obstacle_handles:
+                if cur_time < len(waypoints) * delta_time:
+                    print(cur_time)
+                    # if goals[i] < len(waypoints):
+                    (time, pose) = test_utils.linear_interpolate_waypoints(waypoints, int(cur_time / delta_time))
+                    # time_elapsed = timer() - motion_start
                     # print("Planned time: {}, time elapsed: {}".format(time, time_elapsed))
-                    if time_elapsed >= time:
-                        server.setPose(name, pose)
-                        updated = True
-                        keyframes[i] += step
+                    server.setPose(name, pose)
+                    updated = True
+                    # if goals[i] < len(waypoints) - 1:
+                    #     goals[i] += 1
+                    # cur_time[i] += delta_time
 
             if updated:
                 server.applyChanges()

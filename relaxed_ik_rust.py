@@ -75,6 +75,7 @@ def main(args=None):
     rospy.Subscriber('/simple_marker/update', InteractiveMarkerUpdate, marker_update_cb)
     
     angles_pub = rospy.Publisher('/relaxed_ik/joint_angle_solutions', JointAngles, queue_size=3)
+    time_pub = rospy.Publisher('/relaxed_ik/current_time', Float64, queue_size=3)
     
     if args[1] == "cartesian_path": 
         robot = URDF.from_parameter_server()
@@ -102,18 +103,26 @@ def main(args=None):
                 initialized = False
 
         ja_stream = []
-        keyframe = 0.0
-        step = 1.0
+        goal_idx = 0
+        cur_time = 0.0
+        delta_time = 0.01
+        max_time = len(waypoints) * delta_time * 1000.0
         pos_goal_tolerance = 0.01
         quat_goal_tolerance = 0.01
         trans_cur = init_trans
         rot_cur = init_rot
         rate = rospy.Rate(3000)
 
-        motion_time = waypoints[-1][0] - waypoints[0][0]
-        motion_start = timer()
+        # motion_time = waypoints[-1][0] - waypoints[0][0]
+        # motion_start = timer()
         while not rospy.is_shutdown():
-            (time, p) = test_utils.linear_interpolate_waypoints(waypoints, keyframe)
+            if cur_time >= max_time or goal_idx > len(waypoints) - 1: break
+
+            cur_time_msg = Float64()
+            cur_time_msg.data = cur_time
+            time_pub.publish(cur_time_msg)
+
+            (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
             pos_arr = (ctypes.c_double * 3)()
             quat_arr = (ctypes.c_double * 4)()
 
@@ -150,27 +159,29 @@ def main(args=None):
             angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
             # print(dis, angle_between)
 
-            time_elapsed = timer() - motion_start
-            if time_elapsed > 2.0 * motion_time:
-                print("\nThe motion is planned to take {} seconds and in practice it takes {} seconds".format(motion_time, time_elapsed))
-                break
+            # time_elapsed = timer() - motion_start
+            # if time_elapsed > 2.0 * motion_time:
+            #     print("\nThe motion is planned to take {} seconds and in practice it takes {} seconds".format(motion_time, time_elapsed))
+            #     break
             
             if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance:
-                if time_elapsed >= time:
-                    ja_stream.append(ja.angles.data)
-                    if keyframe < len(waypoints) - 1: 
-                        keyframe += step
-                    else:
-                        print("\nThe motion is planned to take {} seconds and in practice it takes {} seconds".format(motion_time, time_elapsed))
-                        break
-            else:
+            #     if time_elapsed >= time:
                 ja_stream.append(ja.angles.data)
+                cur_time += delta_time
+                goal_idx += 1
+                # if goal_idx < len(waypoints) - 1: 
+                    
+                # else:
+                #     break
+            # else:
+            #     ja_stream.append(ja.angles.data)
                 
             rate.sleep()
 
+        print("\nThe path is planned to take {} seconds and in practice it takes {} seconds".format(len(waypoints) * delta_time, cur_time))
         print("Size of the joint state stream: {}".format(len(ja_stream)))
         # print(ja_stream)
-        test_utils.benchmark_evaluate(ja_stream, 0.1)
+        # test_utils.benchmark_evaluate(ja_stream, 0.1)
 
     elif args[1] == "keyboard":
         global eepg

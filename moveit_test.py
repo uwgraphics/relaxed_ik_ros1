@@ -1,6 +1,5 @@
 #! /usr/bin/env python
 
-import test_utils
 import ctypes
 import moveit_commander
 import numpy
@@ -9,19 +8,20 @@ import os
 import rospkg
 import rospy
 import sys
+import test_utils
 import transformations as T
 import yaml
 
+from copy import deepcopy
 from geometry_msgs.msg import Pose, PoseStamped, Point
 from moveit_commander.conversions import pose_to_list
-from moveit_msgs.msg import PlanningScene, CollisionObject
-from moveit_msgs.srv import ApplyPlanningScene, ApplyPlanningSceneRequest
-from pykdl_utils.kdl_kinematics import KDLKinematics
+from moveit_msgs.msg import RobotState, PlanningScene, CollisionObject
+from moveit_msgs.srv import ApplyPlanningScene, ApplyPlanningSceneRequest,\
+                            GetStateValidity, GetStateValidityRequest, GetStateValidityResponse
 from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
 from shape_msgs.msg import SolidPrimitive, Mesh, MeshTriangle
 from std_msgs.msg import Float64, String
 from timeit import default_timer as timer
-from urdf_parser_py.urdf import URDF
 from visualization_msgs.msg import InteractiveMarkerFeedback, InteractiveMarkerUpdate
 
 co_pub = rospy.Publisher('/collision_object', CollisionObject, queue_size=100)
@@ -87,21 +87,21 @@ def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale,
         
         co.meshes = [mesh]
         co.mesh_poses = [p.pose]
-        submit([co], True)
+        submit([co], False)
     elif shape == "mesh":
         scene.add_mesh(name, p, filename, size=(0.02 * scale[0], 0.02 * scale[0], 0.02 * scale[0]))
 
     print(name)
 
-def update_collision_object(collison_objects, new_poses, synchronous=False):
+def update_collision_object(collison_objects, new_poses, synchronous=True):
     new_co = []
     for i, old_co in enumerate(collison_objects):
-        co = CollisionObject()
+        co = deepcopy(old_co)
         co.operation = CollisionObject.MOVE
-        co.id = old_co.id
-        co.header = old_co.header
-        co.primitives = old_co.primitives
-        co.primitive_poses = [new_poses[i]]
+        if len(co.primitives) > 0:
+            co.primitive_poses = [new_poses[i]]
+        else:
+            co.mesh_poses = [new_poses[i]]
         new_co.append(co)
 
     submit(new_co, synchronous)
@@ -111,7 +111,7 @@ def submit(new_co, synchronous):
     if synchronous:
         scene = PlanningScene()
         scene.is_diff = True
-        scene.robot_state.is_diff = True
+        # scene.robot_state.is_diff = True
         scene.world.collision_objects = new_co
         diff_req = ApplyPlanningSceneRequest()
         diff_req.scene = scene
@@ -162,14 +162,12 @@ def main(args=None):
     rospy.init_node('move_group_python_interface', anonymous=True)
 
     angles_pub = rospy.Publisher('/relaxed_ik/joint_angle_solutions', JointAngles, queue_size=3)
-
-    urdf = URDF.from_parameter_server()
-    kdl_kin = KDLKinematics(urdf, "/base", "/right_hand")
     
     robot = moveit_commander.RobotCommander()
     scene = moveit_commander.PlanningSceneInterface()
 
-    move_group = moveit_commander.MoveGroupCommander("right_arm")
+    group_name = "right_arm"
+    move_group = moveit_commander.MoveGroupCommander(group_name)
     move_group.set_end_effector_link("right_hand")
     # move_group.allow_replanning(True)
 
@@ -191,8 +189,11 @@ def main(args=None):
     init_pose = move_group.get_current_pose().pose
     waypoints = test_utils.get_abs_waypoints(relative_waypoints, init_pose)
 
-    # print(waypoints)
+    time_pub = rospy.Publisher('/relaxed_ik/current_time', Float64, queue_size=3)
 
+    sv_srv = rospy.ServiceProxy("/check_state_validity", GetStateValidity)
+    sv_srv.wait_for_service(service_timeout)
+    
     initialized = False
     while not initialized: 
         try: 
@@ -202,66 +203,69 @@ def main(args=None):
             initialized = False
 
     ja_stream = []
-    keyframe = 0.0
-    step = 1.0
-    pos_goal_tolerance = 0.01
-    quat_goal_tolerance = 0.01
-    trans_cur = [init_pose.position.x, init_pose.position.y, init_pose.position.z]
-    rot_cur = [init_pose.orientation.w, init_pose.orientation.x, init_pose.orientation.y, init_pose.orientation.z]
+    goal_idx = 1
+    cur_time = 0.0
+    delta_time = 0.01
+    max_time = len(waypoints) * delta_time * 1000.0
+
+    (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
+    move_group.set_pose_target(p)
+    plan = move_group.plan()
+    ja_stream.append(list(plan.joint_trajectory.points[0].positions))
+
     rate = rospy.Rate(3000)
-
-    motion_time = waypoints[-1][0] - waypoints[0][0]
-    motion_start = timer()
     while not rospy.is_shutdown():
-        # print(keyframe)
-        (time, p) = test_utils.linear_interpolate_waypoints(waypoints, keyframe)
-        move_group.set_pose_target(p)
+        if cur_time >= max_time: break
 
-        # start = timer()
-        plan = move_group.plan()
-        # end = timer()
-        # print("Speed: {}".format(1.0 / (end - start)))
+        cur_time_msg = Float64()
+        cur_time_msg.data = cur_time
+        time_pub.publish(cur_time_msg)
         
-        time_elapsed = timer() - motion_start
-        if time_elapsed > 20.0 * motion_time:
-            print("\nThe motion is planned to take {} seconds and in practice it takes {} seconds".format(motion_time, time_elapsed))
-            break
-
-        if len(plan.joint_trajectory.points) > 0:
-            ja_list = list(plan.joint_trajectory.points[-1].positions)
-            
-            pose = kdl_kin.forward(ja_list)
-            trans_cur = [pose[0,3], pose[1,3], pose[2,3]]
-            rot_cur = T.quaternion_from_matrix(pose)
-            # print(trans, rot)
-
-            trans_goal = [p.position.x, p.position.y, p.position.z]
-            rot_goal = [p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z]
-            # print("Next goal position: {}\nNext goal orientation: {}".format(list(trans_goal), list(rot_goal)))
-
-            dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
-            angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
-            # print(dis, angle_between)
-
-            if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance:
-                if time_elapsed >= time:
-                    ja = JointAngles()
-                    ja.angles.data = ja_list
-                    angles_pub.publish(ja)
-                    ja_stream.append(ja_list)
-                    move_group.execute(plan)
-
-                    if keyframe < len(waypoints) - 1:
-                        keyframe += step
-                    else:
-                        print("\nThe motion is planned to take {} seconds and in practice it takes {} seconds".format(motion_time, time_elapsed))
-                        break
+        # print("goal index: {}, cur time: {}".format(goal_idx, cur_time))
+        in_collision = False
+        for i, traj_point in enumerate(plan.joint_trajectory.points[1:]):
+            rs = RobotState()
+            rs.joint_state.name = plan.joint_trajectory.joint_names
+            rs.joint_state.position = traj_point.positions
+            gsvr = GetStateValidityRequest()
+            gsvr.robot_state = rs
+            gsvr.group_name = group_name
+            result = sv_srv.call(gsvr)
+            # if result is not valid, it is in collision
+            if not result.valid:
+                # print("Collision!")
+                in_collision = True
+                plan_partial = deepcopy(plan)
+                plan_partial.joint_trajectory.points = plan.joint_trajectory.points[:i]
+                move_group.execute(plan_partial)
+                (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
+                move_group.set_pose_target(p)
+                plan = move_group.plan()
+                break
             else:
+                ja_list = list(traj_point.positions)
+                # print (ja_list)
                 ja_stream.append(ja_list)
-                print("Planned pose is not close enough!")
+
+                ja = JointAngles()
+                ja.angles.data = ja_list
+                angles_pub.publish(ja)
+
+                cur_time += delta_time
+                goal_idx += 1
+
+        if goal_idx > len(waypoints) - 1:
+            break
+        
+        if not in_collision:
+            move_group.execute(plan)
+            (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
+            move_group.set_pose_target(p)
+            plan = move_group.plan()
 
         rate.sleep()
 
+    print("\nThe path is planned to take {} seconds and in practice it takes {} seconds".format(len(waypoints) * delta_time, cur_time))
     print("============ Size of the joint state stream: {}".format(len(ja_stream)))
 
 if __name__ == '__main__':
