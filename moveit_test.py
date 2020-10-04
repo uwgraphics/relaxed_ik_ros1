@@ -127,15 +127,26 @@ def main(args=None):
     # Global var to keep the update info of collision objects    
     global co_updates
 
+    # Load relevant information
+    path_to_src = os.path.dirname(__file__)
+    info_file_name = open(path_to_src + '/relaxed_ik_core/config/loaded_robot', 'r').read()
+    info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
+    info_file = open(info_file_path, 'r')
+    y = yaml.load(info_file)
+    fixed_frame = y['fixed_frame']
+    ee_links = test_utils.get_ee_link(info_file_name)
+    if ee_links == None: ee_links = y['ee_fixed_joints']
+    group_name = test_utils.get_group_name(info_file_name)
+
     # Initialize MoveIt
     moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('move_group_python_interface', anonymous=True)
     robot = moveit_commander.RobotCommander()
     scene = moveit_commander.PlanningSceneInterface()
+    
     # Initialize Move group interface
-    group_name = "right_arm"
     move_group = moveit_commander.MoveGroupCommander(group_name)
-    move_group.set_end_effector_link("right_hand")
+    move_group.set_end_effector_link(ee_links[0])
     # move_group.allow_replanning(True)
 
     # Publishers
@@ -153,16 +164,6 @@ def main(args=None):
     planning_scene_srv.wait_for_service(service_timeout)
     state_validity_srv = rospy.ServiceProxy("/check_state_validity", GetStateValidity)
     state_validity_srv.wait_for_service(service_timeout)
-
-    # Load relevant information
-    path_to_src = os.path.dirname(__file__)
-    info_file_name = open(path_to_src + '/relaxed_ik_core/config/loaded_robot', 'r').read()
-    info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
-    info_file = open(info_file_path, 'r')
-    y = yaml.load(info_file)
-    fixed_frame = y['fixed_frame']
-    ee_links = test_utils.get_ee_link(info_file_name)
-    if ee_links == None: ee_links = y['ee_fixed_joints']
 
     # Set up the kinematics chain
     robot_urdf = URDF.from_parameter_server()

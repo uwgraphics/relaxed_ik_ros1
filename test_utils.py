@@ -18,6 +18,11 @@ def get_ee_link(info_file_name):
     name = info_file_name.split('_')[0]
     ee_dict = {"ur5": ["ee_link"], "iiwa7": ["iiwa_link_ee"], "jaco7": ["j2s7s300_end_effector"]}
     return ee_dict.get(name)
+
+def get_group_name(info_file_name):
+    name = info_file_name.split('_')[0]
+    ee_dict = {"ur5": "manipulator", "sawyer": "right_arm", "iiwa7": "manipulator", "jaco7": "manipulator"}
+    return ee_dict.get(name)
     
 def read_cartesian_path(filename):
     file = open(filename, 'r')
