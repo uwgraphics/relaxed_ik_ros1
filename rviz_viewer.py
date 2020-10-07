@@ -134,7 +134,7 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=Non
             rz_control.orientation.y = c
             rz_control.orientation.z = 0
             rz_control.name = "rotate_z"
-            control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
+            rz_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
             int_marker.controls.append(rz_control)
 
             ry_control = InteractiveMarkerControl()

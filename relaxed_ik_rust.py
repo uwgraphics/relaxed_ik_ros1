@@ -95,7 +95,10 @@ def main(args=None):
         init_rot = T.quaternion_from_matrix(pose)
 
         # Read the cartesian path
-        waypoints = test_utils.read_cartesian_path(rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/cartesian_path_prototype")
+        cartesian_path_file_name = "square"
+        waypoints = test_utils.read_cartesian_path(rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/" + cartesian_path_file_name)
+        final_trans_goal = numpy.array(init_trans) + numpy.array([waypoints[-1][1].position.x, waypoints[-1][1].position.y, waypoints[-1][1].position.z])
+        final_rot_goal = T.quaternion_multiply([waypoints[-1][1].orientation.w, waypoints[-1][1].orientation.x, waypoints[-1][1].orientation.y, waypoints[-1][1].orientation.z], init_rot)
         
         # Wait for the start signal
         print("Waiting for ROS param /exp_status to be set as go...")
@@ -112,7 +115,7 @@ def main(args=None):
         cur_time = 0.0
         delta_time = 0.01
         stuck_count = 0
-        max_time = len(waypoints) * delta_time * 5.0
+        max_time = len(waypoints) * delta_time * 50.0
         ja_stream = []
         prev_sol = starting_config
         
@@ -123,6 +126,7 @@ def main(args=None):
             cur_time_msg = Float64()
             cur_time_msg.data = cur_time
             time_pub.publish(cur_time_msg)
+            
             # Get the pose goal
             (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
             pos_arr = (ctypes.c_double * 3)()
@@ -134,38 +138,49 @@ def main(args=None):
             quat_arr[1] = p.orientation.y
             quat_arr[2] = p.orientation.z
             quat_arr[3] = p.orientation.w
+            
             # Solve
             start = timer()
             xopt = lib.solve(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
             end = timer()
             print("Speed: {}".format(1.0 / (end - start)))
+            
             # Publish the joint angle solution
             ja = JointAngles()
             for i in range(xopt.length):
                 ja.angles.data.append(xopt.data[i])
             angles_pub.publish(ja)
-            # Calculate the distance and the angle between the current state and the current goal
+
+            ja_stream.append(ja.angles.data)
+            cur_time += delta_time
+            goal_idx += 1
+
+            # Calculate the distance and the angle between the current state and the goal
             pose = kdl_kin.forward(ja.angles.data)
             trans_cur = [pose[0,3], pose[1,3], pose[2,3]]
             rot_cur = T.quaternion_from_matrix(pose)
-            print("Current position: {}\nCurrent orientation: {}".format(list(trans_cur), list(rot_cur)))
-            trans_goal = numpy.array(init_trans) + numpy.array([p.position.x, p.position.y, p.position.z])
-            rot_goal = T.quaternion_multiply([p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z], init_rot)
-            print("Current goal position: {}\nCurrent goal orientation: {}".format(list(trans_goal), list(rot_goal)))
-            dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
-            angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
-            print(dis, angle_between)
-            # Advance the clock
-            pos_goal_tolerance = 0.01
-            quat_goal_tolerance = 0.01
+            # # print("Current position: {}\nCurrent orientation: {}".format(list(trans_cur), list(rot_cur)))
+            # trans_goal = numpy.array(init_trans) + numpy.array([p.position.x, p.position.y, p.position.z])
+            # rot_goal = T.quaternion_multiply([p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z], init_rot)
+            # # print("Current goal position: {}\nCurrent goal orientation: {}".format(list(trans_goal), list(rot_goal)))
+            dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(final_trans_goal))
+            angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, final_rot_goal)) * 2.0
+            # print(dis, angle_between)
+            
+            # # Advance the clock
+            pos_goal_tolerance = 0.002
+            quat_goal_tolerance = 0.002
             if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance:
-                ja_stream.append(ja.angles.data)
-                cur_time += delta_time
-                if goal_idx < len(waypoints) - 1:
-                    goal_idx += 1
-                else:
-                    break
+                print("The path is finished successfully!")
+                break
+            #     ja_stream.append(ja.angles.data)
+            #     cur_time += delta_time
+            #     if goal_idx < len(waypoints) - 1:
+            #         goal_idx += 1
+            #     else:
+            #         break
             # Check if relaxed Ik gets stuck in local minimum
+            
             v_norm = numpy.linalg.norm(numpy.array(ja.angles.data) - numpy.array(prev_sol))
             prev_sol = ja.angles.data
             # print(v_norm)
@@ -174,12 +189,13 @@ def main(args=None):
             else:
                 stuck_count = 0
             
-            if stuck_count > 20 and cur_time > len(waypoints) * delta_time:
+            if stuck_count > 100 and cur_time > len(waypoints) * delta_time:
+                print("relaxed IK is stucked in local minimum!")
                 break
 
             rate.sleep()
 
-        print("\nThe path is planned to take {} seconds and in practice it takes {} seconds".format(len(waypoints) * delta_time, cur_time))
+        print("The path is planned to take {} seconds and in practice it takes {} seconds".format(len(waypoints) * delta_time, cur_time))
         print("Size of the joint state stream: {}".format(len(ja_stream)))
         # test_utils.benchmark_evaluate(ja_stream, 0.1)
         

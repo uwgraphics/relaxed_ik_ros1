@@ -134,6 +134,8 @@ def main(args=None):
     info_file = open(info_file_path, 'r')
     y = yaml.load(info_file)
     fixed_frame = y['fixed_frame']
+    if info_file_name == "hubo8_info.yaml":
+        fixed_frame = "Body_TORSO"
     ee_links = test_utils.get_ee_link(info_file_name)
     if ee_links == None: ee_links = y['ee_fixed_joints']
     group_name = test_utils.get_group_name(info_file_name)
@@ -183,7 +185,8 @@ def main(args=None):
     # Read the cartesian path
     rospack = rospkg.RosPack()
     p = rospack.get_path('relaxed_ik_ros1') 
-    relative_waypoints = test_utils.read_cartesian_path(p + "/cartesian_path_files/cartesian_path_prototype")
+    cartesian_path_file_name = "square"
+    relative_waypoints = test_utils.read_cartesian_path(p + "/cartesian_path_files/" + cartesian_path_file_name, scale=1.5)
     init_pose = move_group.get_current_pose().pose
     waypoints = test_utils.get_abs_waypoints(relative_waypoints, init_pose)
     final_trans_goal = [waypoints[-1][1].position.x, waypoints[-1][1].position.y, waypoints[-1][1].position.z]
@@ -203,7 +206,7 @@ def main(args=None):
     goal_idx = 1
     cur_time = 0.0
     delta_time = 0.01
-    max_time = len(waypoints) * delta_time * 5.0
+    max_time = len(waypoints) * delta_time * 50.0
 
     # Calculate the initial plan
     (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
@@ -246,6 +249,7 @@ def main(args=None):
         # print("goal index: {}, cur time: {}".format(goal_idx, cur_time))
         in_collision = False
         for i, traj_point in enumerate(plan.joint_trajectory.points[1:]):
+            cur_time += delta_time
             # Check for collision
             rs = RobotState()
             rs.joint_state.name = plan.joint_trajectory.joint_names
@@ -268,13 +272,14 @@ def main(args=None):
                 break
             else:
                 ja_list = list(traj_point.positions)
+                if info_file_name == "hubo8_info.yaml":
+                    del ja_list[-2]
                 ja_stream.append(ja_list)
 
                 ja = JointAngles()
                 ja.angles.data = ja_list
                 angles_pub.publish(ja)
 
-                cur_time += delta_time
                 if goal_idx < len(waypoints) - 1:
                     goal_idx += 1
 

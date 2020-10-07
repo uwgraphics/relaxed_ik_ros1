@@ -16,15 +16,15 @@ def is_point(pt):
 
 def get_ee_link(info_file_name):
     name = info_file_name.split('_')[0]
-    ee_dict = {"ur5": ["ee_link"], "iiwa7": ["iiwa_link_ee"], "jaco7": ["j2s7s300_end_effector"]}
+    ee_dict = {"ur5": ["ee_link"], "iiwa7": ["iiwa_link_ee"], "jaco7": ["j2s7s300_end_effector"], "hubo8": ["Body_RHAND"]}
     return ee_dict.get(name)
 
 def get_group_name(info_file_name):
     name = info_file_name.split('_')[0]
-    ee_dict = {"ur5": "manipulator", "sawyer": "right_arm", "iiwa7": "manipulator", "jaco7": "manipulator"}
+    ee_dict = {"ur5": "manipulator", "sawyer": "right_arm", "iiwa7": "manipulator", "jaco7": "manipulator", "hubo8": "right_arm"}
     return ee_dict.get(name)
     
-def read_cartesian_path(filename):
+def read_cartesian_path(filename, scale=1.0):
     file = open(filename, 'r')
     lines = file.readlines()
     waypoints = []
@@ -36,9 +36,9 @@ def read_cartesian_path(filename):
         orientation = info[2].split(',')
 
         wpose = Pose()
-        wpose.position.x = float(position[0])
-        wpose.position.y = float(position[1])
-        wpose.position.z = float(position[2])
+        wpose.position.x = float(position[0]) * scale
+        wpose.position.y = float(position[1]) * scale
+        wpose.position.z = float(position[2]) * scale
         wpose.orientation.w = float(orientation[0])
         wpose.orientation.x = float(orientation[1])
         wpose.orientation.y = float(orientation[2])
