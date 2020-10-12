@@ -1,10 +1,10 @@
 robot_link_radius: 0.05
 boxes:
-  - name: box1
-    parameters: [0.35,0.6,0.002]
-    is_dynamic: 0
-    rotation: [0.0,0.0,0.0]
-    translation: [0.6,0.0,0.0]
+  # - name: box1
+  #   parameters: [0.35,0.6,0.002]
+  #   is_dynamic: 0
+  #   rotation: [0.0,0.0,0.0]
+  #   translation: [0.6,0.0,0.0]
   # - name: box2
   #   parameters: [0.35,0.6,0.002]
   #   coordinate_frame: 0
@@ -15,12 +15,12 @@ spheres:
     parameters: 0.1
     is_dynamic: 1
     cartesian_path: cartesian_path_prototype
-    translation: [0.4,0.5,0.25]
+    translation: [0.4,0.4,0.3]
   - name: sphere2
     parameters: 0.15
     is_dynamic: 1
     cartesian_path: cartesian_path_prototype
-    translation: [0.3,-0.7,0.3]
+    translation: [0.5,-0.7,0.3]
   - name: sphere3
     parameters: 0.12
     is_dynamic: 1

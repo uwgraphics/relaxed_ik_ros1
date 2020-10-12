@@ -18,12 +18,12 @@ from moveit_commander.conversions import pose_to_list
 from moveit_msgs.msg import RobotState, PlanningScene, CollisionObject
 from moveit_msgs.srv import ApplyPlanningScene, ApplyPlanningSceneRequest,\
                             GetStateValidity, GetStateValidityRequest, GetStateValidityResponse
-from pykdl_utils.kdl_kinematics import KDLKinematics
 from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
+from robot import Robot
 from shape_msgs.msg import SolidPrimitive, Mesh, MeshTriangle
 from std_msgs.msg import Float64, String
 from timeit import default_timer as timer
-from urdf_parser_py.urdf import URDF
+from urdf_load import urdf_load
 from visualization_msgs.msg import InteractiveMarkerFeedback, InteractiveMarkerUpdate
 
 co_updates = []
@@ -133,17 +133,18 @@ def main(args=None):
     info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
     info_file = open(info_file_path, 'r')
     y = yaml.load(info_file)
-    fixed_frame = y['fixed_frame']
-    if info_file_name == "hubo8_info.yaml":
-        fixed_frame = "Body_TORSO"
+    fixed_ee_joints = y['ee_fixed_joints']
     ee_links = test_utils.get_ee_link(info_file_name)
-    if ee_links == None: ee_links = y['ee_fixed_joints']
+    if ee_links == None: ee_links = fixed_ee_joints
+    full_joint_lists = y['joint_names']
+    joint_order = y['joint_ordering']
+    num_chains = len(full_joint_lists)
     group_name = test_utils.get_group_name(info_file_name)
 
     # Initialize MoveIt
     moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('move_group_python_interface', anonymous=True)
-    robot = moveit_commander.RobotCommander()
+    robot_commander = moveit_commander.RobotCommander()
     scene = moveit_commander.PlanningSceneInterface()
     
     # Initialize Move group interface
@@ -167,26 +168,29 @@ def main(args=None):
     state_validity_srv = rospy.ServiceProxy("/check_state_validity", GetStateValidity)
     state_validity_srv.wait_for_service(service_timeout)
 
-    # Set up the kinematics chain
-    robot_urdf = URDF.from_parameter_server()
-    kdl_kin = KDLKinematics(robot_urdf, fixed_frame, ee_links[0])
+    # Set up Relaxed IK Python robot
+    arms = []
+    for i in range(num_chains):
+        urdf_robot, arm, arm_c, tree = urdf_load('', '', '', full_joint_lists[i], fixed_ee_joints[i])
+        arms.append(arm)
+    robot = Robot(arms, full_joint_lists, joint_order)
     
     # Set up the collision world
     rospy.sleep(2)
-    set_collision_world(robot, scene, co_pub)
+    set_collision_world(robot_commander, scene, co_pub)
 
     # Print help messages
     print("============ Collision objects: {}".format(scene.get_known_object_names()))
-    print("============ Available Planning Groups: {}".format(robot.get_group_names()))
+    print("============ Available Planning Groups: {}".format(robot_commander.get_group_names()))
     print("============ Move group joints: {}".format(move_group.get_joints()))
     print("============ Planning frame: {}".format(move_group.get_planning_frame()))
     print("============ End effector link: {}".format(move_group.get_end_effector_link()))
 
     # Read the cartesian path
     rospack = rospkg.RosPack()
-    p = rospack.get_path('relaxed_ik_ros1') 
+    package_path = rospack.get_path('relaxed_ik_ros1') 
     cartesian_path_file_name = "square"
-    relative_waypoints = test_utils.read_cartesian_path(p + "/cartesian_path_files/" + cartesian_path_file_name, scale=1.5)
+    relative_waypoints = test_utils.read_cartesian_path(package_path + "/cartesian_path_files/" + cartesian_path_file_name, scale=1.0)
     init_pose = move_group.get_current_pose().pose
     waypoints = test_utils.get_abs_waypoints(relative_waypoints, init_pose)
     final_trans_goal = [waypoints[-1][1].position.x, waypoints[-1][1].position.y, waypoints[-1][1].position.z]
@@ -245,11 +249,16 @@ def main(args=None):
             # Clear the updates
             co_updates = []
         
+        if len(plan.joint_trajectory.points) == 0:
+            ja_stream.append(ja_stream[-1])
+            cur_time += delta_time
+            if goal_idx < len(waypoints) - 1:
+                goal_idx += 1
+
         # Check collision and execuate the plan returned by MoveIt
         # print("goal index: {}, cur time: {}".format(goal_idx, cur_time))
         in_collision = False
         for i, traj_point in enumerate(plan.joint_trajectory.points[1:]):
-            cur_time += delta_time
             # Check for collision
             rs = RobotState()
             rs.joint_state.name = plan.joint_trajectory.joint_names
@@ -269,6 +278,11 @@ def main(args=None):
                 (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
                 move_group.set_pose_target(p)
                 plan = move_group.plan()
+
+                ja_stream.append(ja_stream[-1])
+                cur_time += delta_time
+                if goal_idx < len(waypoints) - 1:
+                    goal_idx += 1
                 break
             else:
                 ja_list = list(traj_point.positions)
@@ -280,18 +294,18 @@ def main(args=None):
                 ja.angles.data = ja_list
                 angles_pub.publish(ja)
 
+                cur_time += delta_time
                 if goal_idx < len(waypoints) - 1:
                     goal_idx += 1
 
-        pose_cur = kdl_kin.forward(ja_stream[-1])
-        trans_cur = [pose_cur[0,3], pose_cur[1,3], pose_cur[2,3]]
-        rot_cur = T.quaternion_from_matrix(pose_cur)
+        trans_cur = robot.get_ee_positions(ja_stream[-1])[0]
+        rot_cur = robot.get_ee_rotations(ja_stream[-1])[0]
         dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(final_trans_goal))
         angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, final_rot_goal)) * 2.0
-        pos_goal_tolerance = 0.002
-        quat_goal_tolerance = 0.002
+        pos_goal_tolerance = 0.005
+        quat_goal_tolerance = 0.005
         if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance: 
-            print("============ The path is finished successfully")
+            print("The path is finished successfully")
             break
         
         if not in_collision:
@@ -303,7 +317,12 @@ def main(args=None):
         rate.sleep()
 
     print("The path is planned to take {} seconds and in practice it takes {} seconds".format(len(waypoints) * delta_time, cur_time))
-    print("============ Size of the joint state stream: {}".format(len(ja_stream)))
+    print("Size of the joint state stream: {}".format(len(ja_stream)))
+
+    benchmark_evaluator = test_utils.BenchmarkEvaluator(ja_stream, delta_time, \
+            package_path + "/output_files", "moveit", info_file_name.split('_')[0])
+    benchmark_evaluator.write_ja_stream()
+    benchmark_evaluator.calculate_joint_stats()
 
 if __name__ == '__main__':
     main()
