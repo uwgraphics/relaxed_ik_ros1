@@ -53,7 +53,7 @@ point_cloud:
     scale: [2.0,2.0,2.0]
     rotation: [1.57,0.0,-1.57]
     translation: [1.0,-0.25,0.15]
-    file: bunnyData.pts
+    file: bunnyData
 # tri_mesh:
 #   - name: cat
 #     parameters: [0.05,0.05,0.05]

@@ -2,8 +2,13 @@
 
 import csv
 import numpy
+import os
 import transformations as T
+import yaml
+
 from geometry_msgs.msg import Pose
+from robot import Robot
+from urdf_load import urdf_load
 
 def is_point(pt):
     if len(pt) < 3:
@@ -136,74 +141,128 @@ def extract_joint_states(ja_stream_list, step):
     while i < len(ja_stream_list):
         new_ja_stream.append(ja_stream_list[i])
         i += step
-    print("The original joint state stream of size {} is interpolated as {} waypoints"\
-        .format(len(ja_stream_list), len(new_ja_stream)))
+    # print("The original joint state stream of size {} is interpolated as {} waypoints"\
+    #     .format(len(ja_stream_list), len(new_ja_stream)))
     return new_ja_stream
 
 class BenchmarkEvaluator:
-    def __init__(self, ja_stream, interval, root, interface, robot):
+    def __init__(self, waypoints, ja_stream, delta_time, step, root, interface, robot):
+        self.waypoints = waypoints
         self.ja_stream = numpy.array(ja_stream)
-        self.interval = interval
+        self.delta_time = delta_time
+        self.step = step
         self.root = root
         self.interface = interface
         self.robot = robot
 
-    def write_ja_stream(self):
-        path = self.root + '/' + self.robot + '/joint_states_' + self.interface
+    def write_ja_stream(self, interpolate=True):
+        new_ja_stream = self.ja_stream
+        if interpolate:
+            new_ja_stream = extract_joint_states(self.ja_stream, int(1 / self.step))
+        path = self.root + '/' + self.robot + '/' + self.robot + '_' + self.interface + '.rmoo'
         with open(path, "w") as file:
-            writer = csv.writer(file, delimiter=',')
-            writer.writerows(self.ja_stream)
+            for i, ja in enumerate(new_ja_stream):
+                file.write('{};{}\n'.format(i * self.delta_time, ','.join(str(n) for n in ja)))
     
-    def calculate_joint_stats(self):
+    def calculate_joint_stats(self, interpolate=False):
+        new_ja_stream = self.ja_stream
+        interval = self.delta_time * self.step
+        if interpolate:
+            new_ja_stream = extract_joint_states(self.ja_stream, int(1 / self.step))
+            interval = self.delta_time
+        
         v_sum = 0.0
         a_sum = 0.0
         jerk_sum = 0.0
         joint_velocities = []
         joint_accelerations = []
-        joint_jerks = []
-        for i, x in enumerate(self.ja_stream):
+        joint_jerks = []    
+        for i, x in enumerate(new_ja_stream):
             if i == 0: continue
-            v1 = x - self.ja_stream[i-1]
+            v1 = x - new_ja_stream[i-1]
             joint_velocities.append(v1)
             # v_sum += numpy.linalg.norm(v1)
             if i == 1: continue
-            v2 = self.ja_stream[i-1] - self.ja_stream[i-2]
+            v2 = new_ja_stream[i-1] - new_ja_stream[i-2]
             a1 = v1 - v2
             joint_accelerations.append(a1)
             # a_sum += numpy.linalg.norm(a1)
             if i == 2: continue
-            v3 = self.ja_stream[i-2] - self.ja_stream[i-3]
+            v3 = new_ja_stream[i-2] - new_ja_stream[i-3]
             a2 = v2 - v3
             j1 = a1 - a2
             joint_jerks.append(j1)
             # jerk_sum += numpy.linalg.norm(j1)
 
         for v in joint_velocities:
-            v /= self.interval
+            v /= interval
             v_sum += numpy.linalg.norm(v)
 
         for a in joint_accelerations:
-            a /= self.interval
+            a /= interval**2
             a_sum += numpy.linalg.norm(a)
         
         for j in joint_jerks:
-            j /= self.interval
+            j /= interval**3
             jerk_sum +=  numpy.linalg.norm(j)
         
-        v_aver = v_sum / (len(self.ja_stream) - 1)
-        a_aver = a_sum / (len(self.ja_stream) - 2)
-        jerk_aver = jerk_sum / (len(self.ja_stream) - 3)
-        
-        print("Average joint velocity22: {}\nAverage joint acceleration: {}\nAverage joint jerk: {}"\
-            .format(v_aver, a_aver, jerk_aver))
+        v_avg = v_sum / (len(new_ja_stream) - 1)
+        a_avg = a_sum / (len(new_ja_stream) - 2)
+        jerk_avg = jerk_sum / (len(new_ja_stream) - 3)
 
-        file_names = [('velocities', joint_velocities), ('accelerations', joint_accelerations), \
-            ('jerks', joint_jerks)]
-        for name, array in file_names:
-            path = self.root + '/' + self.robot + '/joint_' + name + '_' + self.interface
-            with open(path, "w") as file:
-                writer = csv.writer(file, delimiter=',')
-                writer.writerows(array)
+        # file_names = [('velocities', joint_velocities), ('accelerations', joint_accelerations), \
+        #     ('jerks', joint_jerks)]
+        # for name, array in file_names:
+        #     path = self.root + '/' + self.robot + '/joint_' + name + '_' + self.interface
+        #     with open(path, "w") as file:
+        #         writer = csv.writer(file, delimiter=',')
+        #         writer.writerows(array)
+
+        return v_avg, a_avg, jerk_avg
         
-    def calculate_error_stats(self):
-        print("Average position errors: {}\nAverage rotation error: {}")
+    def calculate_error_stats(self, interpolate=False):
+        path_to_src = os.path.dirname(__file__)
+        info_file_name = open(path_to_src + '/relaxed_ik_core/config/loaded_robot', 'r').read()
+        info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
+        info_file = open(info_file_path, 'r')
+        y = yaml.load(info_file)
+        starting_config = y['starting_config']
+        fixed_ee_joints = y['ee_fixed_joints']
+        full_joint_lists = y['joint_names']
+        joint_order = y['joint_ordering']
+        num_chains = len(full_joint_lists)
+
+        # Set up Relaxed IK Python robot
+        arms = []
+        for i in range(num_chains):
+            urdf_robot, arm, arm_c, tree = urdf_load('', '', '', full_joint_lists[i], fixed_ee_joints[i])
+            arms.append(arm)
+        robot = Robot(arms, full_joint_lists, joint_order)
+        init_trans = robot.get_ee_positions(starting_config)[0]
+        init_rot = robot.get_ee_rotations(starting_config)[0]
+        
+        new_ja_stream = self.ja_stream
+        step = self.step
+        if interpolate:
+            new_ja_stream = extract_joint_states(self.ja_stream, int(1 / self.step))
+            step = 1
+        pos_error_sum = 0.0
+        rot_error_sum = 0.0
+        goal_idx = 0
+        for ja in new_ja_stream:
+            trans_cur = robot.get_ee_positions(ja)[0]
+            rot_cur = robot.get_ee_rotations(ja)[0]
+
+            (time, p) = linear_interpolate_waypoints(self.waypoints, goal_idx)
+            trans_goal = numpy.array(init_trans) + numpy.array([p.position.x, p.position.y, p.position.z])
+            rot_goal = T.quaternion_multiply([p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z], init_rot)
+
+            pos_error_sum += numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
+            rot_error_sum = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
+            
+            goal_idx += step
+
+        pos_error_avg = pos_error_sum / len(new_ja_stream)
+        rot_error_avg = rot_error_sum / len(new_ja_stream)
+
+        return pos_error_avg, rot_error_avg

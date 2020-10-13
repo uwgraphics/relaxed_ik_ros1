@@ -148,83 +148,133 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=Non
 
     return int_marker
 
-def set_collision_world(server, path_to_src, fixed_frame):
-    env_collision_file_path = path_to_src + '/env_collision_files/env_collision.yaml'
-        
-    if os.path.exists(env_collision_file_path):
-        env_collision_file = open(env_collision_file_path, 'r')
-        env_collision = yaml.load(env_collision_file)
-        
-        dyn_obstacle_handles = []
-        cartesian_folder_path = rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/"
+def set_collision_world(server, path_to_src, fixed_frame, file_type='rmos'):
+    cartesian_folder_path = rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/"
+    if file_type == 'rmos':
+        env_collision_file_path = path_to_src + '/rmos_files/test.rmos'
+        if os.path.exists(env_collision_file_path):
+            dyn_obstacle_handles = []
+            with open(env_collision_file_path, 'r') as env_collision_file:
+                lines = env_collision_file.read().split('\n')
+                file_break = False
+                for line in lines:
+                    if line[0] == '#':
+                        file_break = True
+                        continue
+                    if line[0].isalnum():
+                        if not file_break:
+                            continue
+                    else:
+                        continue
+                    data_no_comment = line.split('//')
+                    data = data_no_comment[0].strip().split(';')
+                    name = data[0]
+                    # scale = float(data[1])
+                    motion_file = data[2]
+                    is_dynamic = True
+                    if motion_file == "static":
+                        is_dynamic = False
 
-        if 'boxes' in env_collision: 
-            planes = env_collision['boxes']
-            if planes is not None:
-                for p in planes:
-                    int_marker = makeMarker(p['name'], fixed_frame, "box", p['translation'], p['rotation'], p['parameters'], p['is_dynamic'])
-                    server.insert(int_marker, processFeedback)
-                    if 'cartesian_path' in p and p['cartesian_path'] is not None:
-                        path = cartesian_folder_path + p['cartesian_path']
-                        relative_waypoints = test_utils.read_cartesian_path(path)
-                        waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
-                        dyn_obstacle_handles.append((int_marker.name, waypoints))
-
-        if 'spheres' in env_collision:
-            spheres = env_collision['spheres']
-            if spheres is not None:
-                for s in spheres:
-                    radius = s['parameters']
-                    int_marker = makeMarker(s['name'], fixed_frame, "sphere", s['translation'], [0, 0, 0], [radius, radius, radius], s['is_dynamic'])
-                    server.insert(int_marker, processFeedback)
-                    if 'cartesian_path' in s and s['cartesian_path'] is not None:
-                        path = cartesian_folder_path + s['cartesian_path']
-                        relative_waypoints = test_utils.read_cartesian_path(path)
-                        waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
-                        dyn_obstacle_handles.append((int_marker.name, waypoints))
-
-        if 'point_cloud' in env_collision: 
-            point_cloud = env_collision['point_cloud']
-            if point_cloud is not None:
-                for pc in point_cloud:
-                    pcd_path = path_to_src + '/env_collision_files/' + pc['file']
-                    scales = pc['scale']
+                    pcd_path = path_to_src + '/point_cloud_files/' + name
                     points = []
                     with open(pcd_path, 'r') as point_cloud_file:
-                        lines = point_cloud_file.read().split('\n')
-                        for line in lines:
-                            pt = line.split(' ')
+                        point_lines = point_cloud_file.read().split('\n')
+                        for point_line in point_lines:
+                            pt = point_line.split(',')
                             if test_utils.is_point(pt):
                                 point = Point()
-                                point.x = float(pt[0]) * scales[0]
-                                point.y = float(pt[1]) * scales[1]
-                                point.z = float(pt[2]) * scales[2]
+                                point.x = float(pt[0])
+                                point.y = float(pt[1])
+                                point.z = float(pt[2])
+                                # print(point)
                                 points.append(point)
-                    
-                    int_marker = makeMarker(pc['name'], fixed_frame, "pcd", pc['translation'], pc['rotation'], [0.01, 0.01, 0.0], pc['is_dynamic'], points=points)
-                    server.insert(int_marker, processFeedback)
-                    if 'cartesian_path' in pc and pc['cartesian_path'] is not None:
-                        path = cartesian_folder_path + pc['cartesian_path']
-                        relative_waypoints = test_utils.read_cartesian_path(path)
-                        waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
-                        dyn_obstacle_handles.append((int_marker.name, waypoints))
-        
-        if 'tri_mesh' in env_collision:
-            tri_meshes = env_collision['tri_mesh']
-            if tri_meshes is not None:
-                for m in tri_meshes:
-                    mesh_path = 'package://relaxed_ik_ros1/env_collision_files/' + m['file']
-                    int_marker = makeMarker(m['name'], fixed_frame, "mesh", m['translation'], m['rotation'], m['parameters'], m['is_dynamic'], mesh_file=mesh_path)
-                    server.insert(int_marker, processFeedback)
-                    if 'cartesian_path' in m and m['cartesian_path'] is not None:
-                        path = cartesian_folder_path + m['cartesian_path']
-                        relative_waypoints = test_utils.read_cartesian_path(path)
-                        waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
-                        dyn_obstacle_handles.append((int_marker.name, waypoints))
+                        
+                        int_marker = makeMarker(name, fixed_frame, "pcd", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.01, 0.01, 0.0], is_dynamic, points=points)
+                        server.insert(int_marker, processFeedback)
+                        if is_dynamic:
+                            path = cartesian_folder_path + motion_file
+                            relative_waypoints = test_utils.read_cartesian_path(path)
+                            waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                            dyn_obstacle_handles.append((int_marker.name, waypoints))
 
-        server.applyChanges()
+            server.applyChanges()
 
-        return dyn_obstacle_handles
+            return dyn_obstacle_handles
+    else:
+        env_collision_file_path = path_to_src + '/env_collision_files/env_collision.yaml'
+        if os.path.exists(env_collision_file_path):
+            env_collision_file = open(env_collision_file_path, 'r')
+            env_collision = yaml.load(env_collision_file)
+            
+            dyn_obstacle_handles = []
+
+            if 'boxes' in env_collision: 
+                planes = env_collision['boxes']
+                if planes is not None:
+                    for p in planes:
+                        int_marker = makeMarker(p['name'], fixed_frame, "box", p['translation'], p['rotation'], p['parameters'], p['is_dynamic'])
+                        server.insert(int_marker, processFeedback)
+                        if 'cartesian_path' in p and p['cartesian_path'] is not None:
+                            path = cartesian_folder_path + p['cartesian_path']
+                            relative_waypoints = test_utils.read_cartesian_path(path)
+                            waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                            dyn_obstacle_handles.append((int_marker.name, waypoints))
+
+            if 'spheres' in env_collision:
+                spheres = env_collision['spheres']
+                if spheres is not None:
+                    for s in spheres:
+                        radius = s['parameters']
+                        int_marker = makeMarker(s['name'], fixed_frame, "sphere", s['translation'], [0, 0, 0], [radius, radius, radius], s['is_dynamic'])
+                        server.insert(int_marker, processFeedback)
+                        if 'cartesian_path' in s and s['cartesian_path'] is not None:
+                            path = cartesian_folder_path + s['cartesian_path']
+                            relative_waypoints = test_utils.read_cartesian_path(path)
+                            waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                            dyn_obstacle_handles.append((int_marker.name, waypoints))
+
+            if 'point_cloud' in env_collision: 
+                point_cloud = env_collision['point_cloud']
+                if point_cloud is not None:
+                    for pc in point_cloud:
+                        pcd_path = path_to_src + '/env_collision_files/' + pc['file']
+                        scales = pc['scale']
+                        points = []
+                        with open(pcd_path, 'r') as point_cloud_file:
+                            lines = point_cloud_file.read().split('\n')
+                            for line in lines:
+                                pt = line.split(' ')
+                                if test_utils.is_point(pt):
+                                    point = Point()
+                                    point.x = float(pt[0]) * scales[0]
+                                    point.y = float(pt[1]) * scales[1]
+                                    point.z = float(pt[2]) * scales[2]
+                                    points.append(point)
+                        
+                        int_marker = makeMarker(pc['name'], fixed_frame, "pcd", pc['translation'], pc['rotation'], [0.01, 0.01, 0.0], pc['is_dynamic'], points=points)
+                        server.insert(int_marker, processFeedback)
+                        if 'cartesian_path' in pc and pc['cartesian_path'] is not None:
+                            path = cartesian_folder_path + pc['cartesian_path']
+                            relative_waypoints = test_utils.read_cartesian_path(path)
+                            waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                            dyn_obstacle_handles.append((int_marker.name, waypoints))
+            
+            if 'tri_mesh' in env_collision:
+                tri_meshes = env_collision['tri_mesh']
+                if tri_meshes is not None:
+                    for m in tri_meshes:
+                        mesh_path = 'package://relaxed_ik_ros1/env_collision_files/' + m['file']
+                        int_marker = makeMarker(m['name'], fixed_frame, "mesh", m['translation'], m['rotation'], m['parameters'], m['is_dynamic'], mesh_file=mesh_path)
+                        server.insert(int_marker, processFeedback)
+                        if 'cartesian_path' in m and m['cartesian_path'] is not None:
+                            path = cartesian_folder_path + m['cartesian_path']
+                            relative_waypoints = test_utils.read_cartesian_path(path)
+                            waypoints = test_utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
+                            dyn_obstacle_handles.append((int_marker.name, waypoints))
+
+            server.applyChanges()
+
+            return dyn_obstacle_handles
 
 def main(args=None):
     rospy.init_node('rviz_viewer')

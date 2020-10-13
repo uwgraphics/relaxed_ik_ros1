@@ -54,9 +54,12 @@ def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale,
         scene.add_box(name, p, (scale[0] * 2.0, scale[1] * 2.0, scale[2] * 2.0))
     elif shape == 'sphere':
         scene.add_sphere(name, p, scale[0])
-    elif shape == 'pcd':
-        point_cloud = numpy.loadtxt(filename, skiprows=1)
+    elif shape == 'pts' or shape == 'pcd':
         pcd = open3d.geometry.PointCloud()
+        if shape == 'pts':
+            point_cloud = numpy.loadtxt(filename, skiprow=1)
+        else:
+            point_cloud = numpy.loadtxt(filename, delimiter=',')
         # open3d.visualization.draw_geometries([pcd])
         pcd.points = open3d.utility.Vector3dVector(point_cloud[:,:3])
         convex_hull = pcd.compute_convex_hull()[0]
@@ -86,40 +89,72 @@ def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale,
     else:
         print("Unrecognized shape: {}".format(shape))
 
-def set_collision_world(robot, scene, co_pub):
+def set_collision_world(robot, scene, co_pub, file_type='rmos'):
     planning_frame = robot.get_planning_frame()
     path_to_src = os.path.dirname(__file__)
-    env_collision_file_path = path_to_src + '/env_collision_files/env_collision.yaml'
-    if os.path.exists(env_collision_file_path):
-        env_collision_file = open(env_collision_file_path, 'r')
-        env_collision = yaml.load(env_collision_file)
-        
-        if 'boxes' in env_collision: 
-            planes = env_collision['boxes']
-            if planes is not None:
-                for i, p in enumerate(planes):
-                    add_collision_object(scene, p['name'], planning_frame, "box", p['translation'], p['rotation'], p['parameters'], p['is_dynamic'])
+    if file_type == 'rmos':
+        env_collision_file_path = path_to_src + '/rmos_files/test.rmos'
+        if os.path.exists(env_collision_file_path):
+            with open(env_collision_file_path, 'r') as env_collision_file:
+                lines = env_collision_file.read().split('\n')
+                file_break = False
+                for line in lines:
+                    if line[0] == '#':
+                        file_break = True
+                        continue
+                    if line[0].isalnum():
+                        if not file_break:
+                            continue
+                    else:
+                        continue
+                    data_no_comment = line.split('//')
+                    data = data_no_comment[0].strip().split(';')
+                    name = data[0]
+                    # scale = float(data[1])
+                    motion_file = data[2]
+                    is_dynamic = True
+                    if motion_file == "static":
+                        is_dynamic = False
 
-        if 'spheres' in env_collision:
-            spheres = env_collision['spheres']
-            if spheres is not None:
-                for i, s in enumerate(spheres):
-                    radius = s['parameters']
-                    add_collision_object(scene, s['name'], planning_frame, "sphere", s['translation'], [0, 0, 0], [radius, radius, radius], s['is_dynamic'])
-        
-        if 'point_cloud' in env_collision: 
-            point_cloud = env_collision['point_cloud']
-            if point_cloud is not None:
-                for pc in point_cloud:
-                    pcd_path = path_to_src + '/env_collision_files/' + pc['file']
-                    add_collision_object(scene, pc['name'], planning_frame, "pcd", pc['translation'], pc['rotation'], pc['scale'], pc['is_dynamic'], filename=pcd_path, co_pub=co_pub)
+                    pcd_path = path_to_src + '/point_cloud_files/' + name
+                    add_collision_object(scene, name, planning_frame, "pcd", [0.0, 0.0, 0.0], \
+                        [0.0, 0.0, 0.0], [1.0, 1.0, 1.0], is_dynamic, filename=pcd_path, co_pub=co_pub)
+    else:
+        env_collision_file_path = path_to_src + '/env_collision_files/env_collision.yaml'
+        if os.path.exists(env_collision_file_path):
+            env_collision_file = open(env_collision_file_path, 'r')
+            env_collision = yaml.load(env_collision_file)
+            
+            if 'boxes' in env_collision: 
+                planes = env_collision['boxes']
+                if planes is not None:
+                    for i, p in enumerate(planes):
+                        add_collision_object(scene, p['name'], planning_frame, "box", p['translation'], \
+                            p['rotation'], p['parameters'], p['is_dynamic'])
 
-        if 'tri_mesh' in env_collision: 
-            tri_mesh = env_collision['tri_mesh']
-            if tri_mesh is not None:
-                for m in tri_mesh:
-                    mesh_path = path_to_src + '/env_collision_files/' + m['file']
-                    add_collision_object(scene, m['name'], planning_frame, "mesh", m['translation'], m['rotation'], m['parameters'], m['is_dynamic'], filename=mesh_path)
+            if 'spheres' in env_collision:
+                spheres = env_collision['spheres']
+                if spheres is not None:
+                    for i, s in enumerate(spheres):
+                        radius = s['parameters']
+                        add_collision_object(scene, s['name'], planning_frame, "sphere", s['translation'], \
+                            [0, 0, 0], [radius, radius, radius], s['is_dynamic'])
+            
+            if 'point_cloud' in env_collision: 
+                point_cloud = env_collision['point_cloud']
+                if point_cloud is not None:
+                    for pc in point_cloud:
+                        pcd_path = path_to_src + '/env_collision_files/' + pc['file']
+                        add_collision_object(scene, pc['name'], planning_frame, "pts", pc['translation'], \
+                            pc['rotation'], pc['scale'], pc['is_dynamic'], filename=pcd_path, co_pub=co_pub)
+
+            if 'tri_mesh' in env_collision: 
+                tri_mesh = env_collision['tri_mesh']
+                if tri_mesh is not None:
+                    for m in tri_mesh:
+                        mesh_path = path_to_src + '/env_collision_files/' + m['file']
+                        add_collision_object(scene, m['name'], planning_frame, "mesh", m['translation'], \
+                            m['rotation'], m['parameters'], m['is_dynamic'], filename=mesh_path)
 
 def main(args=None):
     print("\nMoveIt initialized!")
@@ -190,7 +225,7 @@ def main(args=None):
     rospack = rospkg.RosPack()
     package_path = rospack.get_path('relaxed_ik_ros1') 
     cartesian_path_file_name = "square"
-    relative_waypoints = test_utils.read_cartesian_path(package_path + "/cartesian_path_files/" + cartesian_path_file_name, scale=1.0)
+    relative_waypoints = test_utils.read_cartesian_path(package_path + "/cartesian_path_files/" + cartesian_path_file_name, scale=0.5)
     init_pose = move_group.get_current_pose().pose
     waypoints = test_utils.get_abs_waypoints(relative_waypoints, init_pose)
     final_trans_goal = [waypoints[-1][1].position.x, waypoints[-1][1].position.y, waypoints[-1][1].position.z]
@@ -210,7 +245,8 @@ def main(args=None):
     goal_idx = 1
     cur_time = 0.0
     delta_time = 0.01
-    max_time = len(waypoints) * delta_time * 50.0
+    max_time = len(waypoints) * delta_time * 5.0
+    num_collisions = 0
 
     # Calculate the initial plan
     (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
@@ -250,6 +286,7 @@ def main(args=None):
             co_updates = []
         
         if len(plan.joint_trajectory.points) == 0:
+            num_collisions += 1
             ja_stream.append(ja_stream[-1])
             cur_time += delta_time
             if goal_idx < len(waypoints) - 1:
@@ -316,13 +353,26 @@ def main(args=None):
 
         rate.sleep()
 
-    print("The path is planned to take {} seconds and in practice it takes {} seconds".format(len(waypoints) * delta_time, cur_time))
-    print("Size of the joint state stream: {}".format(len(ja_stream)))
+    robot_name = info_file_name.split('_')[0]
+    benchmark_evaluator = test_utils.BenchmarkEvaluator(relative_waypoints, ja_stream, delta_time, 1, \
+            package_path + "/rmoo_files", "moveit", robot_name)
+    benchmark_evaluator.write_ja_stream(interpolate=False)
+    v_avg, a_avg, jerk_avg = benchmark_evaluator.calculate_joint_stats()
+    pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats()
 
-    benchmark_evaluator = test_utils.BenchmarkEvaluator(ja_stream, delta_time, \
-            package_path + "/output_files", "moveit", info_file_name.split('_')[0])
-    benchmark_evaluator.write_ja_stream()
-    benchmark_evaluator.calculate_joint_stats()
+    robot_str = "Robot: {}\n".format(robot_name)
+    software_str = "Software: MoveIt!\n"
+    motion_time_str = "Planned motion length: {}\nActual motion length: {}\n".format(len(waypoints) * delta_time, cur_time)
+    joint_stream_str = "Size of the joint state stream: {}\n".format(len(ja_stream))
+    joint_stats_str = "Average joint velocity: {}\nAverage joint acceleration: {}\nAverage joint jerk: {}\n"\
+        .format(v_avg, a_avg, jerk_avg)
+    err_stats_str = "Average position error: {}\nAverage rotation error: {}\n".format(pos_error_avg, rot_error_avg)
+    num_collisions_str = "Number of environment collisions: {}".format(num_collisions)
+    print(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
+
+    rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + robot_name + '_moveit.rmob'
+    with open(rmob_file_path, 'w') as rmob_file:
+        rmob_file.write(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
 
 if __name__ == '__main__':
     main()
