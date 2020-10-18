@@ -136,6 +136,8 @@ def main(args=None):
         ja_stream = []
         prev_sol = starting_config
         num_collisions = 0
+        pos_goal_tolerance = 0.01
+        quat_goal_tolerance = 0.01
         
         rate = rospy.Rate(3000)
         while not rospy.is_shutdown():
@@ -182,9 +184,6 @@ def main(args=None):
             angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, final_rot_goal)) * 2.0
             print(dis, angle_between)
             
-            # # Advance the clock
-            pos_goal_tolerance = 0.01
-            quat_goal_tolerance = 0.01
             if dis < pos_goal_tolerance and (angle_between < quat_goal_tolerance or mode == 'ECA3'):
                 print("The path is finished successfully!")
                 break

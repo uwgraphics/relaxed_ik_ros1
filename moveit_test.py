@@ -254,12 +254,17 @@ def main(args=None):
     delta_time = 0.01
     max_time = len(waypoints) * delta_time * 5.0
     num_collisions = 0
+    pos_goal_tolerance = 0.01
+    quat_goal_tolerance = 0.01
+    interpolation_times = 3
 
     # Calculate the initial plan
     (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
     move_group.set_pose_target(p)
     plan = move_group.plan()
-    ja_stream = [list(plan.joint_trajectory.points[0].positions)]
+    trajectory = [list(plan.joint_trajectory.points[x].positions) for x in range(len(plan.joint_trajectory.points))]
+    trajectory = test_utils.linear_interpolate_joint_states(trajectory, interpolation_times)
+    ja_stream = [list(trajectory[0])]
 
     # Start the calculation
     rate = rospy.Rate(3000)
@@ -292,8 +297,7 @@ def main(args=None):
             # Clear the updates
             co_updates = []
         
-        if len(plan.joint_trajectory.points) == 0:
-            num_collisions += 1
+        if len(trajectory) == 0:
             ja_stream.append(ja_stream[-1])
             cur_time += delta_time
             if goal_idx < len(waypoints) - 1:
@@ -302,17 +306,18 @@ def main(args=None):
         # Check collision and execuate the plan returned by MoveIt
         # print("goal index: {}, cur time: {}".format(goal_idx, cur_time))
         in_collision = False
-        for i, traj_point in enumerate(plan.joint_trajectory.points[1:]):
+        for i, traj_point in enumerate(trajectory[1:]):
             # Check for collision
             rs = RobotState()
             rs.joint_state.name = plan.joint_trajectory.joint_names
-            rs.joint_state.position = traj_point.positions
+            rs.joint_state.position = traj_point
             sv_req = GetStateValidityRequest()
             sv_req.robot_state = rs
             sv_req.group_name = group_name
             result = state_validity_srv.call(sv_req)
             # if result is not valid, it is in collision
             if not result.valid:
+                num_collisions += 1
                 # print("Collision occured at trajectory point {}!".format(traj_point))
                 in_collision = True
                 plan_partial = deepcopy(plan)
@@ -329,7 +334,7 @@ def main(args=None):
                     goal_idx += 1
                 break
             else:
-                ja_list = list(traj_point.positions)
+                ja_list = list(traj_point)
                 if info_file_name == "hubo8_info.yaml":
                     del ja_list[-2]
                 ja_stream.append(ja_list)
@@ -346,8 +351,7 @@ def main(args=None):
         rot_cur = robot.get_ee_rotations(ja_stream[-1])[0]
         dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(final_trans_goal))
         angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, final_rot_goal)) * 2.0
-        pos_goal_tolerance = 0.005
-        quat_goal_tolerance = 0.005
+        
         if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance: 
             print("The path is finished successfully")
             break
@@ -357,6 +361,8 @@ def main(args=None):
             (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
             move_group.set_pose_target(p)
             plan = move_group.plan()
+            trajectory = [list(plan.joint_trajectory.points[x].positions) for x in range(len(plan.joint_trajectory.points))]
+            trajectory = test_utils.linear_interpolate_joint_states(trajectory, interpolation_times)
 
         rate.sleep()
 
