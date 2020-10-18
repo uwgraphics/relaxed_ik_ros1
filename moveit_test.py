@@ -99,6 +99,7 @@ def set_collision_world(robot, scene, co_pub, file_type='rmos'):
                 lines = env_collision_file.read().split('\n')
                 file_break = False
                 for line in lines:
+                    if len(line) == 0: continue
                     if line[0] == '#':
                         file_break = True
                         continue
@@ -224,8 +225,14 @@ def main(args=None):
     # Read the cartesian path
     rospack = rospkg.RosPack()
     package_path = rospack.get_path('relaxed_ik_ros1') 
-    cartesian_path_file_name = "square"
-    relative_waypoints = test_utils.read_cartesian_path(package_path + "/cartesian_path_files/" + cartesian_path_file_name, scale=0.5)
+    env_collision_file_path = path_to_src + '/rmos_files/test.rmos'
+    if os.path.exists(env_collision_file_path):
+        with open(env_collision_file_path, 'r') as env_collision_file:
+            lines = env_collision_file.read().split('\n')
+            data_no_comment = lines[0].split('//')
+            data = data_no_comment[0].strip().split(';')
+            cartesian_path_file_name = data[-1]
+    relative_waypoints = test_utils.read_cartesian_path(package_path + "/cartesian_path_files/" + cartesian_path_file_name, scale=1.0)
     init_pose = move_group.get_current_pose().pose
     waypoints = test_utils.get_abs_waypoints(relative_waypoints, init_pose)
     final_trans_goal = [waypoints[-1][1].position.x, waypoints[-1][1].position.y, waypoints[-1][1].position.z]

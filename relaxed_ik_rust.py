@@ -89,6 +89,7 @@ def main(args=None):
         full_joint_lists = y['joint_names']
         joint_order = y['joint_ordering']
         num_chains = len(full_joint_lists)
+        mode = open(path_to_src + '/rmos_files/objective_mode', 'r').read()
 
         # Set up Relaxed IK Python robot
         arms = []
@@ -107,9 +108,9 @@ def main(args=None):
                 lines = env_collision_file.read().split('\n')
                 data_no_comment = lines[0].split('//')
                 data = data_no_comment[0].strip().split(';')
-                cartesian_path_file_name = data[1]
+                cartesian_path_file_name = data[-1]
         waypoints = test_utils.read_cartesian_path(rospkg.RosPack()\
-            .get_path('relaxed_ik_ros1') + "/cartesian_path_files/" + cartesian_path_file_name, scale=0.5)
+            .get_path('relaxed_ik_ros1') + "/cartesian_path_files/" + cartesian_path_file_name, scale=1.0)
         final_trans_goal = numpy.array(init_trans) + numpy.array([waypoints[-1][1].position.x, \
             waypoints[-1][1].position.y, waypoints[-1][1].position.z])
         final_rot_goal = T.quaternion_multiply([waypoints[-1][1].orientation.w, waypoints[-1][1].orientation.x, \
@@ -179,12 +180,12 @@ def main(args=None):
             # print("Current position: {}\nCurrent orientation: {}".format(list(trans_cur), list(rot_cur)))
             dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(final_trans_goal))
             angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, final_rot_goal)) * 2.0
-            # print(dis, angle_between)
+            print(dis, angle_between)
             
             # # Advance the clock
-            pos_goal_tolerance = 0.005
-            quat_goal_tolerance = 0.005
-            if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance:
+            pos_goal_tolerance = 0.01
+            quat_goal_tolerance = 0.01
+            if dis < pos_goal_tolerance and (angle_between < quat_goal_tolerance or mode == 'ECA3'):
                 print("The path is finished successfully!")
                 break
 
@@ -195,7 +196,7 @@ def main(args=None):
             if v_norm == 0.0:
                 num_collisions += 1
                 stuck_count += 1
-            elif v_norm < 0.0001:
+            elif v_norm < 0.001:
                 stuck_count += 1
             else:
                 stuck_count = 0
@@ -208,24 +209,26 @@ def main(args=None):
 
         robot_name = info_file_name.split('_')[0]
         benchmark_evaluator = test_utils.BenchmarkEvaluator(waypoints, ja_stream, delta_time, step, \
-            package_path + "/rmoo_files", "relaxed_ik", robot_name)
+            package_path + "/rmoo_files", "relaxed_ik" + '_' + mode, robot_name)
         benchmark_evaluator.write_ja_stream(interpolate=True)
         v_avg, a_avg, jerk_avg = benchmark_evaluator.calculate_joint_stats(interpolate=False)
         pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats(interpolate=False)
 
         robot_str = "Robot: {}\n".format(robot_name)
         software_str = "Software: Relaxed IK\n"
+        mode_str = "Mode: {}\n".format(mode)
         motion_time_str = "Planned motion length: {}\nActual motion length: {}\n".format(len(waypoints) * delta_time, cur_time)
         joint_stream_str = "Size of the joint state stream: {}/{}\n".format(int((len(ja_stream) - 1) * step) + 1, len(ja_stream))
         joint_stats_str = "Average joint velocity: {}\nAverage joint acceleration: {}\nAverage joint jerk: {}\n"\
             .format(v_avg, a_avg, jerk_avg)
         err_stats_str = "Average position error: {}\nAverage rotation error: {}\n".format(pos_error_avg, rot_error_avg)
         num_collisions_str = "Number of environment collisions: {}".format(num_collisions)
-        print(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
+        test_result = robot_str + software_str + mode_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str
+        print(test_result)
 
-        rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + robot_name + '_relaxed_ik.rmob'
+        rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + robot_name + '_relaxed_ik_' + mode + '.rmob'
         with open(rmob_file_path, 'w') as rmob_file:
-            rmob_file.write(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
+            rmob_file.write(test_result)
 
     # When the input is keyboard
     elif args[1] == "keyboard":

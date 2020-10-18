@@ -258,7 +258,7 @@ class BenchmarkEvaluator:
             rot_goal = T.quaternion_multiply([p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z], init_rot)
 
             pos_error_sum += numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
-            rot_error_sum = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
+            rot_error_sum += numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
             
             goal_idx += step
 

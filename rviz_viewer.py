@@ -158,6 +158,7 @@ def set_collision_world(server, path_to_src, fixed_frame, file_type='rmos'):
                 lines = env_collision_file.read().split('\n')
                 file_break = False
                 for line in lines:
+                    if len(line) == 0: continue
                     if line[0] == '#':
                         file_break = True
                         continue
