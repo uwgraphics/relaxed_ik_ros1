@@ -264,7 +264,10 @@ def main(args=None):
     plan = move_group.plan()
     trajectory = [list(plan.joint_trajectory.points[x].positions) for x in range(len(plan.joint_trajectory.points))]
     trajectory = test_utils.linear_interpolate_joint_states(trajectory, interpolation_times)
-    ja_stream = [list(trajectory[0])]
+    ja_list = list(list(trajectory[0]))
+    if info_file_name == "hubo8_info.yaml":
+        del ja_list[-2]
+    ja_stream = [ja_list]
 
     # Start the calculation
     rate = rospy.Rate(3000)
