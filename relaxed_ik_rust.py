@@ -90,6 +90,7 @@ def main(args=None):
         joint_order = y['joint_ordering']
         num_chains = len(full_joint_lists)
         mode = open(path_to_src + '/rmos_files/objective_mode', 'r').read()
+        print("Objective mode: {}".format(mode))
 
         # Set up Relaxed IK Python robot
         arms = []
@@ -182,9 +183,10 @@ def main(args=None):
             # print("Current position: {}\nCurrent orientation: {}".format(list(trans_cur), list(rot_cur)))
             dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(final_trans_goal))
             angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, final_rot_goal)) * 2.0
-            print(dis, angle_between)
+            # print(dis, angle_between)
             
-            if dis < pos_goal_tolerance and (angle_between < quat_goal_tolerance or mode == 'ECA3'):
+            if dis < pos_goal_tolerance and (angle_between < quat_goal_tolerance or mode == 'ECA3') \
+                and cur_time > len(waypoints) * delta_time:
                 print("The path is finished successfully!")
                 break
 
@@ -210,8 +212,8 @@ def main(args=None):
         benchmark_evaluator = test_utils.BenchmarkEvaluator(waypoints, ja_stream, delta_time, step, \
             package_path + "/rmoo_files", "relaxed_ik" + '_' + mode, robot_name)
         benchmark_evaluator.write_ja_stream(interpolate=True)
-        v_avg, a_avg, jerk_avg = benchmark_evaluator.calculate_joint_stats(interpolate=False)
-        pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats(interpolate=False)
+        v_avg, a_avg, jerk_avg = benchmark_evaluator.calculate_joint_stats(interpolate=True)
+        pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats(interpolate=True)
 
         robot_str = "Robot: {}\n".format(robot_name)
         software_str = "Software: Relaxed IK\n"

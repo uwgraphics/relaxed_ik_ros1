@@ -352,7 +352,7 @@ def main(args=None):
         dis = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(final_trans_goal))
         angle_between = numpy.linalg.norm(T.quaternion_disp(rot_cur, final_rot_goal)) * 2.0
         
-        if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance: 
+        if dis < pos_goal_tolerance and angle_between < quat_goal_tolerance and cur_time > len(waypoints) * delta_time: 
             print("The path is finished successfully")
             break
         
