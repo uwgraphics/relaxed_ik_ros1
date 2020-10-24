@@ -182,6 +182,7 @@ def main(args=None):
     test_name = test_name_ext.split('.')[0]
 
     env_collision_file_name = open(path_to_src + '/relaxed_ik_core/config/env_collision', 'r').read()
+    env_collision_file_path = path_to_src + '/rmos_files/' + robot_name + "/" + env_collision_file_name
 
     # Initialize MoveIt
     moveit_commander.roscpp_initialize(sys.argv)
@@ -237,27 +238,27 @@ def main(args=None):
             data_no_comment = lines[0].split('//')
             data = data_no_comment[0].strip().split(';')
             cartesian_path_file_name = data[-1]
-    relative_waypoints = test_utils.read_cartesian_path(package_path + "/cartesian_path_files/" + cartesian_path_file_name, scale=1.0)
+    relative_waypoints = test_utils.read_cartesian_path(package_path + "/animation_files/" + robot_name + "/" + cartesian_path_file_name, scale=1.0)
     init_pose = move_group.get_current_pose().pose
     waypoints = test_utils.get_abs_waypoints(relative_waypoints, init_pose)
     final_trans_goal = [waypoints[-1][1].position.x, waypoints[-1][1].position.y, waypoints[-1][1].position.z]
     final_rot_goal = [waypoints[-1][1].orientation.w, waypoints[-1][1].orientation.x, waypoints[-1][1].orientation.y, waypoints[-1][1].orientation.z]
 
     # Wait for the start signal
-    print("Waiting for ROS param /exp_status to be set as go...")
-    initialized = False
-    while not initialized: 
-        try: 
-            param = rospy.get_param("exp_status")
-            initialized = param == "go"
-        except KeyError:
-            initialized = False
+    # print("Waiting for ROS param /exp_status to be set as go...")
+    # initialized = False
+    # while not initialized: 
+    #     try: 
+    #         param = rospy.get_param("exp_status")
+    #         initialized = param == "go"
+    #     except KeyError:
+    #         initialized = False
 
     # Set up initial params
     goal_idx = 1
     cur_time = 0.0
     delta_time = 0.01
-    max_time = len(waypoints) * delta_time * 5.0
+    max_time = len(waypoints) * delta_time * 2.0
     num_collisions = 0
     pos_goal_tolerance = 0.01
     quat_goal_tolerance = 0.01
@@ -314,7 +315,7 @@ def main(args=None):
         # Check collision and execuate the plan returned by MoveIt
         # print("goal index: {}, cur time: {}".format(goal_idx, cur_time))
         in_collision = False
-        for i, traj_point in enumerate(trajectory):
+        for i, traj_point in enumerate(trajectory[1:]):
             # Check for collision
             rs = RobotState()
             rs.joint_state.name = plan.joint_trajectory.joint_names
@@ -326,10 +327,10 @@ def main(args=None):
             # if result is not valid, it is in collision
             if not result.valid:
                 num_collisions += 1
-                print("In collision!")
+                print("In collision at point {}!".format(i))
                 in_collision = True
                 plan_partial = deepcopy(plan)
-                partial_idx = int(math.ceil(i / interpolation_times))
+                partial_idx = int(math.ceil((i + 1) / interpolation_times))
                 # print("Interpolated index: {}, original index: {}".format(i, partial_idx))
                 # traj_before = [list(plan_partial.joint_trajectory.points[x].positions) for x in range(len(plan_partial.joint_trajectory.points))]
                 # print("Plan before: \n{}".format(traj_before))
