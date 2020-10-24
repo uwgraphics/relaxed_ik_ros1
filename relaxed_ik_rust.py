@@ -89,7 +89,11 @@ def main(args=None):
         full_joint_lists = y['joint_names']
         joint_order = y['joint_ordering']
         num_chains = len(full_joint_lists)
-        mode = open(path_to_src + '/rmos_files/objective_mode', 'r').read()
+        mode = open(path_to_src + '/relaxed_ik_core/config/objective_mode', 'r').read()
+        robot_name = info_file_name.split('_')[0]
+        test_name_ext = open(path_to_src + '/relaxed_ik_core/config/env_collision', 'r').read()
+        test_name = test_name_ext.split('.')[0]
+        print("Robot: {}".format(robot_name))
         print("Objective mode: {}".format(mode))
 
         # Set up Relaxed IK Python robot
@@ -103,15 +107,17 @@ def main(args=None):
         # print(init_trans, init_rot)
 
         # Read the cartesian path
-        env_collision_file_path = path_to_src + '/rmos_files/test.rmos'
+        env_collision_file_name = open(path_to_src + '/relaxed_ik_core/config/env_collision', 'r').read()
+        env_collision_file_path = path_to_src + '/rmos_files/' + info_file_name.split('_')[0] + \
+            '/' + env_collision_file_name
         if os.path.exists(env_collision_file_path):
             with open(env_collision_file_path, 'r') as env_collision_file:
                 lines = env_collision_file.read().split('\n')
                 data_no_comment = lines[0].split('//')
                 data = data_no_comment[0].strip().split(';')
                 cartesian_path_file_name = data[-1]
-        waypoints = test_utils.read_cartesian_path(rospkg.RosPack()\
-            .get_path('relaxed_ik_ros1') + "/cartesian_path_files/" + cartesian_path_file_name, scale=1.0)
+        waypoints = test_utils.read_cartesian_path(rospkg.RosPack().get_path('relaxed_ik_ros1') + \
+            "/animation_files/" + robot_name + "/" + cartesian_path_file_name, scale=1.0)
         final_trans_goal = numpy.array(init_trans) + numpy.array([waypoints[-1][1].position.x, \
             waypoints[-1][1].position.y, waypoints[-1][1].position.z])
         final_rot_goal = T.quaternion_multiply([waypoints[-1][1].orientation.w, waypoints[-1][1].orientation.x, \
@@ -208,9 +214,8 @@ def main(args=None):
 
             rate.sleep()
 
-        robot_name = info_file_name.split('_')[0]
         benchmark_evaluator = test_utils.BenchmarkEvaluator(waypoints, ja_stream, delta_time, step, \
-            package_path + "/rmoo_files", "relaxed_ik" + '_' + mode, robot_name)
+            package_path + "/rmoo_files", "relaxed_ik" + '_' + mode, robot_name, test_name)
         benchmark_evaluator.write_ja_stream(interpolate=True)
         v_avg, a_avg, jerk_avg = benchmark_evaluator.calculate_joint_stats(interpolate=True)
         pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats(interpolate=True)
@@ -227,7 +232,7 @@ def main(args=None):
         test_result = robot_str + software_str + mode_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str
         print(test_result)
 
-        rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + robot_name + '_relaxed_ik_' + mode + '.rmob'
+        rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + test_name + '_relaxed_ik_' + mode + '.rmob'
         with open(rmob_file_path, 'w') as rmob_file:
             rmob_file.write(test_result)
 

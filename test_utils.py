@@ -132,7 +132,7 @@ def extract_joint_states(ja_stream_list, step):
     return new_ja_stream
 
 class BenchmarkEvaluator:
-    def __init__(self, waypoints, ja_stream, delta_time, step, root, interface, robot):
+    def __init__(self, waypoints, ja_stream, delta_time, step, root, interface, robot, test_name):
         self.waypoints = waypoints
         self.ja_stream = numpy.array(ja_stream)
         self.delta_time = delta_time
@@ -140,12 +140,13 @@ class BenchmarkEvaluator:
         self.root = root
         self.interface = interface
         self.robot = robot
+        self.test_name = test_name
 
     def write_ja_stream(self, interpolate=True):
         new_ja_stream = self.ja_stream
         if interpolate:
             new_ja_stream = extract_joint_states(self.ja_stream, int(1 / self.step))
-        path = self.root + '/' + self.robot + '/' + self.robot + '_' + self.interface + '.rmoo'
+        path = self.root + '/' + self.robot + '/' + self.test_name + '_' + self.interface + '.rmoo'
         with open(path, "w") as file:
             for i, ja in enumerate(new_ja_stream):
                 file.write('{};{}\n'.format(i * self.delta_time, ','.join(str(n) for n in ja)))

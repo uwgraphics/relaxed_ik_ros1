@@ -1,4 +1,0 @@
-ur5_info.yaml;square // robot info name; name of motion file that end effector should follow
-##################################################### // file break
-ball;0.01;static // name of point cloud geometry file; size that spheres should be in geometry file; name of motion file that this obstacle should follow (static is special keyword for "no motion")
-cube;0.01;square // there could be an arbitrary number of these.  There are just two listed here.

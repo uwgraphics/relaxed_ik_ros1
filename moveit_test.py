@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import ctypes
+import math
 import moveit_commander
 import numpy
 import open3d
@@ -89,11 +90,11 @@ def add_collision_object(scene, name, planning_frame, shape, trans, rots, scale,
     else:
         print("Unrecognized shape: {}".format(shape))
 
-def set_collision_world(robot, scene, co_pub, file_type='rmos'):
+def set_collision_world(robot, robot_name, scene, co_pub, file_type='rmos', file_name=''):
     planning_frame = robot.get_planning_frame()
     path_to_src = os.path.dirname(__file__)
     if file_type == 'rmos':
-        env_collision_file_path = path_to_src + '/rmos_files/test.rmos'
+        env_collision_file_path = path_to_src + '/rmos_files/' + robot_name + "/" + file_name
         if os.path.exists(env_collision_file_path):
             with open(env_collision_file_path, 'r') as env_collision_file:
                 lines = env_collision_file.read().split('\n')
@@ -117,7 +118,7 @@ def set_collision_world(robot, scene, co_pub, file_type='rmos'):
                     if motion_file == "static":
                         is_dynamic = False
 
-                    pcd_path = path_to_src + '/point_cloud_files/' + name
+                    pcd_path = path_to_src + '/geometry_files/' + robot_name + '/' + name
                     add_collision_object(scene, name, planning_frame, "pcd", [0.0, 0.0, 0.0], \
                         [0.0, 0.0, 0.0], [1.0, 1.0, 1.0], is_dynamic, filename=pcd_path, co_pub=co_pub)
     else:
@@ -176,6 +177,11 @@ def main(args=None):
     joint_order = y['joint_ordering']
     num_chains = len(full_joint_lists)
     group_name = test_utils.get_group_name(info_file_name)
+    robot_name = info_file_name.split('_')[0]
+    test_name_ext = open(path_to_src + '/relaxed_ik_core/config/env_collision', 'r').read()
+    test_name = test_name_ext.split('.')[0]
+
+    env_collision_file_name = open(path_to_src + '/relaxed_ik_core/config/env_collision', 'r').read()
 
     # Initialize MoveIt
     moveit_commander.roscpp_initialize(sys.argv)
@@ -213,7 +219,7 @@ def main(args=None):
     
     # Set up the collision world
     rospy.sleep(2)
-    set_collision_world(robot_commander, scene, co_pub)
+    set_collision_world(robot_commander, robot_name, scene, co_pub, file_name=env_collision_file_name)
 
     # Print help messages
     print("============ Collision objects: {}".format(scene.get_known_object_names()))
@@ -225,7 +231,6 @@ def main(args=None):
     # Read the cartesian path
     rospack = rospkg.RosPack()
     package_path = rospack.get_path('relaxed_ik_ros1') 
-    env_collision_file_path = path_to_src + '/rmos_files/test.rmos'
     if os.path.exists(env_collision_file_path):
         with open(env_collision_file_path, 'r') as env_collision_file:
             lines = env_collision_file.read().split('\n')
@@ -264,7 +269,7 @@ def main(args=None):
     plan = move_group.plan()
     trajectory = [list(plan.joint_trajectory.points[x].positions) for x in range(len(plan.joint_trajectory.points))]
     trajectory = test_utils.linear_interpolate_joint_states(trajectory, interpolation_times)
-    ja_list = list(list(trajectory[0]))
+    ja_list = list(trajectory[0])
     if info_file_name == "hubo8_info.yaml":
         del ja_list[-2]
     ja_stream = [ja_list]
@@ -309,7 +314,7 @@ def main(args=None):
         # Check collision and execuate the plan returned by MoveIt
         # print("goal index: {}, cur time: {}".format(goal_idx, cur_time))
         in_collision = False
-        for i, traj_point in enumerate(trajectory[1:]):
+        for i, traj_point in enumerate(trajectory):
             # Check for collision
             rs = RobotState()
             rs.joint_state.name = plan.joint_trajectory.joint_names
@@ -321,20 +326,31 @@ def main(args=None):
             # if result is not valid, it is in collision
             if not result.valid:
                 num_collisions += 1
-                # print("Collision occured at trajectory point {}!".format(traj_point))
+                print("In collision!")
                 in_collision = True
                 plan_partial = deepcopy(plan)
-                plan_partial.joint_trajectory.points = plan.joint_trajectory.points[:i]
-                move_group.execute(plan_partial)
+                partial_idx = int(math.ceil(i / interpolation_times))
+                # print("Interpolated index: {}, original index: {}".format(i, partial_idx))
+                # traj_before = [list(plan_partial.joint_trajectory.points[x].positions) for x in range(len(plan_partial.joint_trajectory.points))]
+                # print("Plan before: \n{}".format(traj_before))
+                plan_partial.joint_trajectory.points = plan_partial.joint_trajectory.points[:partial_idx]
+                # traj_after = [list(plan_partial.joint_trajectory.points[x].positions) for x in range(len(plan_partial.joint_trajectory.points))]
+                # print("Plan after: \n{}".format(traj_after))
+                if len(plan_partial.joint_trajectory.points) > 0:
+                    move_group.execute(plan_partial)
+                    print("Partial execution!")
                 # Trigger a replan
                 (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
                 move_group.set_pose_target(p)
                 plan = move_group.plan()
+                trajectory = [list(plan.joint_trajectory.points[x].positions) for x in range(len(plan.joint_trajectory.points))]
+                trajectory = test_utils.linear_interpolate_joint_states(trajectory, interpolation_times)
 
                 ja_stream.append(ja_stream[-1])
                 cur_time += delta_time
                 if goal_idx < len(waypoints) - 1:
                     goal_idx += 1
+
                 break
             else:
                 ja_list = list(traj_point)
@@ -360,7 +376,10 @@ def main(args=None):
             break
         
         if not in_collision:
-            move_group.execute(plan)
+            print("The size of trajecotry: {}".format(len(trajectory)))
+            if len(plan.joint_trajectory.points) > 0:
+                move_group.execute(plan)
+            # print("Plan successfully executed!")
             (time, p) = test_utils.linear_interpolate_waypoints(waypoints, goal_idx)
             move_group.set_pose_target(p)
             plan = move_group.plan()
@@ -371,7 +390,7 @@ def main(args=None):
 
     robot_name = info_file_name.split('_')[0]
     benchmark_evaluator = test_utils.BenchmarkEvaluator(relative_waypoints, ja_stream, delta_time, 1, \
-            package_path + "/rmoo_files", "moveit", robot_name)
+            package_path + "/rmoo_files", "moveit", robot_name, test_name)
     benchmark_evaluator.write_ja_stream(interpolate=False)
     v_avg, a_avg, jerk_avg = benchmark_evaluator.calculate_joint_stats()
     pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats()
@@ -386,7 +405,7 @@ def main(args=None):
     num_collisions_str = "Number of environment collisions: {}".format(num_collisions)
     print(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
 
-    rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + robot_name + '_moveit.rmob'
+    rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + test_name + '_moveit.rmob'
     with open(rmob_file_path, 'w') as rmob_file:
         rmob_file.write(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
 

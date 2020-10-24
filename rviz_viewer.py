@@ -148,10 +148,11 @@ def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=Non
 
     return int_marker
 
-def set_collision_world(server, path_to_src, fixed_frame, file_type='rmos'):
-    cartesian_folder_path = rospkg.RosPack().get_path('relaxed_ik_ros1') + "/cartesian_path_files/"
+def set_collision_world(server, path_to_src, robot_name, fixed_frame, file_type='rmos', file_name=''):
+    cartesian_folder_path = rospkg.RosPack().get_path('relaxed_ik_ros1') + \
+        "/animation_files/" + robot_name + "/"
     if file_type == 'rmos':
-        env_collision_file_path = path_to_src + '/rmos_files/test.rmos'
+        env_collision_file_path = path_to_src + '/rmos_files/' + robot_name + "/" + file_name
         if os.path.exists(env_collision_file_path):
             dyn_obstacle_handles = []
             with open(env_collision_file_path, 'r') as env_collision_file:
@@ -176,7 +177,7 @@ def set_collision_world(server, path_to_src, fixed_frame, file_type='rmos'):
                     if motion_file == "static":
                         is_dynamic = False
 
-                    pcd_path = path_to_src + '/point_cloud_files/' + name
+                    pcd_path = path_to_src + '/geometry_files/' + robot_name + '/' + name
                     points = []
                     with open(pcd_path, 'r') as point_cloud_file:
                         point_lines = point_cloud_file.read().split('\n')
@@ -303,6 +304,9 @@ def main(args=None):
     rospy.Subscriber('/relaxed_ik/joint_angle_solutions',JointAngles,ja_solution_cb)
     tf_pub = tf.TransformBroadcaster()
 
+    robot_name = info_file_name.split('_')[0]
+    env_collision_file_name = open(path_to_src + '/relaxed_ik_core/config/env_collision', 'r').read()
+
     rospy.sleep(0.5)
 
     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
@@ -319,7 +323,7 @@ def main(args=None):
     dyn_obstacle_handles = []
     args = rospy.myargv(argv=sys.argv)
     if args[1] == "true": 
-        dyn_obstacle_handles = set_collision_world(server, path_to_src, fixed_frame)
+        dyn_obstacle_handles = set_collision_world(server, path_to_src, robot_name, fixed_frame, file_name=env_collision_file_name)
 
     prev_sol = starting_config
     delta_time = 0.01

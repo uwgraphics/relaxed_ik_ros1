@@ -15,5 +15,5 @@ Cargo.lock
 rmob_files/
 rmoo_files/
 rmos_files/
-cartesian_path_files/
-point_cloud_files/
+animation_files/
+geometry_files/
