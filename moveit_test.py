@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import csv
 import ctypes
 import math
 import moveit_commander
@@ -158,8 +159,13 @@ def set_collision_world(robot, robot_name, scene, co_pub, file_type='rmos', file
                         add_collision_object(scene, m['name'], planning_frame, "mesh", m['translation'], \
                             m['rotation'], m['parameters'], m['is_dynamic'], filename=mesh_path)
 
-def main(args=None):
+def main():
     print("\nMoveIt initialized!")
+
+    if len(sys.argv) > 1:
+        iteration = sys.argv[1]
+    else:
+        iteration = 1
 
     # Global var to keep the update info of collision objects    
     global co_updates
@@ -245,14 +251,14 @@ def main(args=None):
     final_rot_goal = [waypoints[-1][1].orientation.w, waypoints[-1][1].orientation.x, waypoints[-1][1].orientation.y, waypoints[-1][1].orientation.z]
 
     # Wait for the start signal
-    # print("Waiting for ROS param /exp_status to be set as go...")
-    # initialized = False
-    # while not initialized: 
-    #     try: 
-    #         param = rospy.get_param("exp_status")
-    #         initialized = param == "go"
-    #     except KeyError:
-    #         initialized = False
+    print("Waiting for ROS param /exp_status to be set as go...")
+    initialized = False
+    while not initialized: 
+        try: 
+            param = rospy.get_param("exp_status")
+            initialized = param == "go"
+        except KeyError:
+            initialized = False
 
     # Set up initial params
     goal_idx = 1
@@ -305,6 +311,16 @@ def main(args=None):
             planning_scene_srv.call(diff_req)
             # Clear the updates
             co_updates = []
+
+        rs = RobotState()
+        rs.joint_state.name = plan.joint_trajectory.joint_names
+        rs.joint_state.position = ja_stream[-1]
+        sv_req = GetStateValidityRequest()
+        sv_req.robot_state = rs
+        sv_req.group_name = group_name
+        result = state_validity_srv.call(sv_req)
+        if not result.valid:
+            num_collisions += 1
         
         if len(trajectory) == 0:
             ja_stream.append(ja_stream[-1])
@@ -326,7 +342,6 @@ def main(args=None):
             result = state_validity_srv.call(sv_req)
             # if result is not valid, it is in collision
             if not result.valid:
-                num_collisions += 1
                 print("In collision at point {}!".format(i))
                 in_collision = True
                 plan_partial = deepcopy(plan)
@@ -392,23 +407,37 @@ def main(args=None):
     robot_name = info_file_name.split('_')[0]
     benchmark_evaluator = test_utils.BenchmarkEvaluator(relative_waypoints, ja_stream, delta_time, 1, \
             package_path + "/rmoo_files", "moveit", robot_name, test_name)
-    benchmark_evaluator.write_ja_stream(interpolate=False)
+    benchmark_evaluator.write_ja_stream(interpolate=False, iteration=iteration)
     v_avg, a_avg, jerk_avg = benchmark_evaluator.calculate_joint_stats()
     pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats()
 
     robot_str = "Robot: {}\n".format(robot_name)
     software_str = "Software: MoveIt!\n"
-    motion_time_str = "Planned motion length: {}\nActual motion length: {}\n".format(len(waypoints) * delta_time, cur_time)
-    joint_stream_str = "Size of the joint state stream: {}\n".format(len(ja_stream))
+    motion_time = len(waypoints) * delta_time
+    motion_time_str = "Planned motion length: {}\nActual motion length: {}\n".format(motion_time, cur_time)
+    output_size = len(ja_stream)
+    joint_stream_str = "Size of the joint state stream: {}\n".format(output_size)
     joint_stats_str = "Average joint velocity: {}\nAverage joint acceleration: {}\nAverage joint jerk: {}\n"\
         .format(v_avg, a_avg, jerk_avg)
     err_stats_str = "Average position error: {}\nAverage rotation error: {}\n".format(pos_error_avg, rot_error_avg)
     num_collisions_str = "Number of environment collisions: {}".format(num_collisions)
     print(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
 
-    rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + test_name + '_moveit.rmob'
+    rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + test_name + '_moveit' + '_' + iteration + '.rmob'
     with open(rmob_file_path, 'w') as rmob_file:
         rmob_file.write(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
+
+    csv_file_path = package_path + '/csv_files/' + 'master.csv'
+    with open(csv_file_path, 'a+') as csv_file:
+        field_names = ["robot", "test", "software", "mode", "planned_motion_length", "actual_motion_length", \
+            "output_size", "average_joint_velocity", "average_joint_acceleration", \
+            "average_joint_jerk", "average_position_error", "average_rotation_error", \
+            "num_env_collisions"]
+        writer = csv.writer(csv_file, delimiter=',')
+        if csv_file.read() == '':
+            writer.writerow(field_names)
+        writer.writerow([robot_name, test_name, "MoveIt!", "N/A", str(motion_time), str(cur_time), str(output_size), \
+            str(v_avg), str(a_avg), str(jerk_avg), str(pos_error_avg), str(rot_error_avg), str(num_collisions)])
 
 if __name__ == '__main__':
     main()

@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import csv
 import ctypes
 import numpy
 import os
@@ -122,6 +123,11 @@ def main(args=None):
             waypoints[-1][1].position.y, waypoints[-1][1].position.z])
         final_rot_goal = T.quaternion_multiply([waypoints[-1][1].orientation.w, waypoints[-1][1].orientation.x, \
             waypoints[-1][1].orientation.y, waypoints[-1][1].orientation.z], init_rot)
+
+        num_collisions_file = open(package_path + "/relaxed_ik_core/num_env_collision", 'w')
+        num_collisions_file.seek(0)
+        num_collisions_file.write('0')
+        num_collisions_file.close()
         
         # Wait for the start signal
         print("Waiting for ROS param /exp_status to be set as go...")
@@ -142,7 +148,6 @@ def main(args=None):
         max_time = len(waypoints) * delta_time * 2.0
         ja_stream = []
         prev_sol = starting_config
-        num_collisions = 0
         pos_goal_tolerance = 0.01
         quat_goal_tolerance = 0.01
         
@@ -200,10 +205,7 @@ def main(args=None):
             v_norm = numpy.linalg.norm(numpy.array(ja.angles.data) - numpy.array(prev_sol))
             prev_sol = ja.angles.data
             # print(v_norm)
-            if v_norm == 0.0:
-                num_collisions += 1
-                stuck_count += 1
-            elif v_norm < 0.001:
+            if v_norm < 0.001:
                 stuck_count += 1
             else:
                 stuck_count = 0
@@ -223,11 +225,17 @@ def main(args=None):
         robot_str = "Robot: {}\n".format(robot_name)
         software_str = "Software: Relaxed IK\n"
         mode_str = "Mode: {}\n".format(mode)
-        motion_time_str = "Planned motion length: {}\nActual motion length: {}\n".format(len(waypoints) * delta_time, cur_time)
-        joint_stream_str = "Size of the joint state stream: {}/{}\n".format(int((len(ja_stream) - 1) * step) + 1, len(ja_stream))
+        motion_time = len(waypoints) * delta_time
+        motion_time_str = "Planned motion length: {}\nActual motion length: {}\n".format(motion_time, cur_time)
+        output_size = int((len(ja_stream) - 1) * step) + 1
+        joint_stream_str = "Size of the joint state stream: {}/{}\n".format(output_size, len(ja_stream))
         joint_stats_str = "Average joint velocity: {}\nAverage joint acceleration: {}\nAverage joint jerk: {}\n"\
             .format(v_avg, a_avg, jerk_avg)
         err_stats_str = "Average position error: {}\nAverage rotation error: {}\n".format(pos_error_avg, rot_error_avg)
+        num_collisions_file = open(package_path + "/relaxed_ik_core/num_env_collision", 'r')
+        num_collisions = num_collisions_file.read()
+        num_collisions_file.close()
+        num_collisions = int(num_collisions * step)
         num_collisions_str = "Number of environment collisions: {}".format(num_collisions)
         test_result = robot_str + software_str + mode_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str
         print(test_result)
@@ -235,6 +243,18 @@ def main(args=None):
         rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + test_name + '_relaxed_ik_' + mode + '.rmob'
         with open(rmob_file_path, 'w') as rmob_file:
             rmob_file.write(test_result)
+        
+        csv_file_path = package_path + '/csv_files/' + 'master.csv'
+        with open(csv_file_path, 'a+') as csv_file:
+            field_names = ["robot", "test", "software", "mode", "planned_motion_length", "actual_motion_length", \
+                "output_size", "average_joint_velocity", "average_joint_acceleration", \
+                "average_joint_jerk", "average_position_error", "average_rotation_error", \
+                "num_env_collisions"]
+            writer = csv.writer(csv_file, delimiter=',')
+            if csv_file.read() == '':
+                writer.writerow(field_names)
+            writer.writerow([robot_name, test_name, "Relaxed IK", mode, str(motion_time), str(cur_time), str(output_size), \
+                str(v_avg), str(a_avg), str(jerk_avg), str(pos_error_avg), str(rot_error_avg), str(num_collisions)])
 
     # When the input is keyboard
     elif args[1] == "keyboard":

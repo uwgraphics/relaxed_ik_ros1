@@ -142,11 +142,15 @@ class BenchmarkEvaluator:
         self.robot = robot
         self.test_name = test_name
 
-    def write_ja_stream(self, interpolate=True):
+    def write_ja_stream(self, interpolate=True, iteration=0):
         new_ja_stream = self.ja_stream
         if interpolate:
             new_ja_stream = extract_joint_states(self.ja_stream, int(1 / self.step))
-        path = self.root + '/' + self.robot + '/' + self.test_name + '_' + self.interface + '.rmoo'
+        path = self.root + '/' + self.robot + '/' + self.test_name + '_' + self.interface 
+        if iteration > 0:
+            path += '_' + iteration + '.rmoo'
+        else:
+            path += '.rmoo'
         with open(path, "w") as file:
             for i, ja in enumerate(new_ja_stream):
                 file.write('{};{}\n'.format(i * self.delta_time, ','.join(str(n) for n in ja)))
@@ -186,11 +190,11 @@ class BenchmarkEvaluator:
             v_sum += numpy.linalg.norm(v)
 
         for a in joint_accelerations:
-            a /= interval**2
+            a /= interval
             a_sum += numpy.linalg.norm(a)
         
         for j in joint_jerks:
-            j /= interval**3
+            j /= interval
             jerk_sum +=  numpy.linalg.norm(j)
         
         v_avg = v_sum / (len(new_ja_stream) - 1)
