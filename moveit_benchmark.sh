@@ -3,7 +3,7 @@
 CONFIG="$(pwd)/relaxed_ik_core/config" 
 RMOS="$(pwd)/rmos_files"
 
-declare -a robots=("ur5" "hubo8" "jco7" "sawyer" "iiwa7")
+declare -a robots=("ur5" "jaco7" "sawyer" "iiwa7" "hubo8")
 
 for i in "${robots[@]}"; do
     echo -n "${i}_info.yaml" > "$CONFIG/loaded_robot"

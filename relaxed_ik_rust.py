@@ -235,7 +235,7 @@ def main(args=None):
         num_collisions_file = open(package_path + "/relaxed_ik_core/num_env_collision", 'r')
         num_collisions = num_collisions_file.read()
         num_collisions_file.close()
-        num_collisions = int(num_collisions * step)
+        num_collisions = int(int(num_collisions) * step)
         num_collisions_str = "Number of environment collisions: {}".format(num_collisions)
         test_result = robot_str + software_str + mode_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str
         print(test_result)
