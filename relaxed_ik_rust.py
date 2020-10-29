@@ -220,7 +220,7 @@ def main(args=None):
             package_path + "/rmoo_files", "relaxed_ik" + '_' + mode, robot_name, test_name)
         benchmark_evaluator.write_ja_stream(interpolate=True)
         v_avg, a_avg, jerk_avg = benchmark_evaluator.calculate_joint_stats(interpolate=True)
-        pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats(interpolate=True)
+        pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats(interpolate=True, write_file=False)
 
         robot_str = "Robot: {}\n".format(robot_name)
         software_str = "Software: Relaxed IK\n"

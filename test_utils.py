@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import csv
+import matplotlib.pyplot as plt
 import numpy
 import os
 import transformations as T
@@ -131,6 +132,68 @@ def extract_joint_states(ja_stream_list, step):
     #     .format(len(ja_stream_list), len(new_ja_stream)))
     return new_ja_stream
 
+def plot_error(paths):
+    pos_handles = []
+    rot_handles = []
+    for path in paths:
+        path_list = path.split('.')
+        del path_list[0]
+        if path_list[1] == "poserr":
+            plt.figure(1)
+        else:
+            plt.figure(2)
+        dir_list = path_list[0].split('/')
+        name_list = dir_list[-1].split('_')
+        
+        time_list = []
+        error_list = []
+        file = open(path, 'r')
+        lines = file.readlines()
+        for line in lines:
+            line = line.strip()
+            info = line.split(';')
+            time_list.append(float(info[0]))
+            error_list.append(float(info[1]))
+        
+        label = ''
+        if name_list[-1] == 'ECA':
+            color = 'blue'
+            label += 'CIK'
+        else:
+            color = 'red'
+            label += 'MCC'
+        
+        if name_list[1] == 'table1':
+            line_width = 1.5
+            line_style = '-'
+            label += '-table1'
+        else:
+            line_width = 2
+            line_style = '--'
+            label += '-table2'
+
+        line, = plt.plot(time_list, error_list, c=color, lw=line_width, \
+            ls=line_style, label=label)
+        
+        if path_list[1] == "poserr":
+            pos_handles.append(line)
+        else:
+            rot_handles.append(line)
+
+    plt.figure(1)
+    plt.grid(True)
+    plt.xlabel("Time")
+    plt.ylabel("Pos. Error")
+    plt.legend(handles=pos_handles, loc='upper left')
+
+    plt.figure(2)
+    plt.grid(True)
+    plt.xlabel("Time")
+    plt.ylabel("Rot. Error")
+    plt.legend(handles=rot_handles, loc='upper left')
+
+    plt.show()
+
 class BenchmarkEvaluator:
     def __init__(self, waypoints, ja_stream, delta_time, step, root, interface, robot, test_name):
         self.waypoints = waypoints
@@ -148,7 +211,7 @@ class BenchmarkEvaluator:
             new_ja_stream = extract_joint_states(self.ja_stream, int(1 / self.step))
         path = self.root + '/' + self.robot + '/' + self.test_name + '_' + self.interface 
         if iteration > 0:
-            path += '_' + iteration + '.rmoo'
+            path += '_' + str(iteration) + '.rmoo'
         else:
             path += '.rmoo'
         with open(path, "w") as file:
@@ -211,7 +274,7 @@ class BenchmarkEvaluator:
 
         return v_avg, a_avg, jerk_avg
         
-    def calculate_error_stats(self, interpolate=False):
+    def calculate_error_stats(self, interpolate=False, write_file=False):
         path_to_src = os.path.dirname(__file__)
         info_file_name = open(path_to_src + '/relaxed_ik_core/config/loaded_robot', 'r').read()
         info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
@@ -237,6 +300,13 @@ class BenchmarkEvaluator:
         if interpolate:
             new_ja_stream = extract_joint_states(self.ja_stream, int(1 / self.step))
             step = 1
+
+        if write_file:
+            pos_error_file_path = self.root + '/' + self.robot + '/' + self.test_name + '_' + self.interface + '.poserr'
+            pos_error_file = open(pos_error_file_path, 'w')
+            rot_error_file_path = self.root + '/' + self.robot + '/' + self.test_name + '_' + self.interface + '.roterr'
+            rot_error_file = open(rot_error_file_path, 'w')
+        
         pos_error_sum = 0.0
         rot_error_sum = 0.0
         goal_idx = 0
@@ -248,9 +318,15 @@ class BenchmarkEvaluator:
             trans_goal = numpy.array(init_trans) + numpy.array([p.position.x, p.position.y, p.position.z])
             rot_goal = T.quaternion_multiply([p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z], init_rot)
 
-            pos_error_sum += numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
-            rot_error_sum += numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
+            pos_error = numpy.linalg.norm(numpy.array(trans_cur) - numpy.array(trans_goal))
+            pos_error_sum += pos_error
+            rot_error = numpy.linalg.norm(T.quaternion_disp(rot_cur, rot_goal)) * 2.0
+            rot_error_sum += rot_error
             
+            if write_file:
+                pos_error_file.write('{};{}\n'.format(time, pos_error))
+                rot_error_file.write('{};{}\n'.format(time, rot_error))
+
             goal_idx += step
 
         pos_error_avg = pos_error_sum / len(new_ja_stream)

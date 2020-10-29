@@ -163,9 +163,9 @@ def main():
     print("\nMoveIt initialized!")
 
     if len(sys.argv) > 1:
-        iteration = sys.argv[1]
+        iteration = int(sys.argv[1])
     else:
-        iteration = 1
+        iteration = 0
 
     # Global var to keep the update info of collision objects    
     global co_updates
@@ -409,7 +409,7 @@ def main():
             package_path + "/rmoo_files", "moveit", robot_name, test_name)
     benchmark_evaluator.write_ja_stream(interpolate=False, iteration=iteration)
     v_avg, a_avg, jerk_avg = benchmark_evaluator.calculate_joint_stats()
-    pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats()
+    pos_error_avg, rot_error_avg = benchmark_evaluator.calculate_error_stats(write_file=False)
 
     robot_str = "Robot: {}\n".format(robot_name)
     software_str = "Software: MoveIt!\n"
@@ -423,7 +423,7 @@ def main():
     num_collisions_str = "Number of environment collisions: {}".format(num_collisions)
     print(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
 
-    rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + test_name + '_moveit' + '_' + iteration + '.rmob'
+    rmob_file_path = package_path + '/rmob_files/' + robot_name + '/' + test_name + '_moveit' + '_' + str(iteration) + '.rmob'
     with open(rmob_file_path, 'w') as rmob_file:
         rmob_file.write(robot_str + software_str + motion_time_str + joint_stream_str + joint_stats_str + err_stats_str + num_collisions_str)
 
