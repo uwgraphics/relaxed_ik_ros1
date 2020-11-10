@@ -166,11 +166,15 @@ def plot_error(paths):
         if name_list[1] == 'table1':
             line_width = 1.5
             line_style = '-'
-            label += '-table1'
+            label += ' table original'
+            if name_list[-1] == 'ECA':
+                color = 'royalblue'
+            else:
+                color = 'tomato'
         else:
-            line_width = 2
+            line_width = 1
             line_style = '--'
-            label += '-table2'
+            label += ' table moved'
 
         line, = plt.plot(time_list, error_list, c=color, lw=line_width, \
             ls=line_style, label=label)
@@ -184,15 +188,67 @@ def plot_error(paths):
     plt.grid(True)
     plt.xlabel("Time")
     plt.ylabel("Pos. Error")
+    plt.xlim(left=0)
+    plt.ylim(bottom=0)
     plt.legend(handles=pos_handles, loc='upper left')
 
     plt.figure(2)
     plt.grid(True)
     plt.xlabel("Time")
     plt.ylabel("Rot. Error")
+    plt.xlim(left=0)
+    plt.ylim(bottom=0)
     plt.legend(handles=rot_handles, loc='upper left')
 
     plt.show()
+
+def write_random_bunnies(number=50, scope=1.5):
+    env_collision_file_path = './env_collision_files/env_collision.yaml'
+    env_collision_file = open(env_collision_file_path, 'a')
+    all_data_list = []
+    for i in range(number):
+        translation = numpy.random.rand(3) * scope * 2 - scope
+        for x in translation:
+            while abs(x) < 0.2:
+                x = numpy.random.rand() * scope * 2 - scope
+        data = {
+            "name" : 'bunny' + str(i),
+            "parameters" : 0.001,
+            "is_dynamic" : 0,
+            "scale" : [2.0,2.0,2.0],
+            "rotation" : [1.57,0.0,-1.57],
+            "translation" : [float(translation[0]), float(translation[1]), float(translation[2])],
+            "file" : 'bunnyData'
+        }
+        all_data_list.append(data)
+
+    all_data = dict(
+        point_cloud = all_data_list
+    )
+    yaml.safe_dump(all_data, env_collision_file)
+
+def get_init_pose():
+    path_to_src = os.path.dirname(__file__)
+    info_file_name = open(path_to_src + '/relaxed_ik_core/config/loaded_robot', 'r').read()
+    info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
+    info_file = open(info_file_path, 'r')
+    y = yaml.load(info_file)
+    starting_config = y['starting_config']
+    fixed_ee_joints = y['ee_fixed_joints']
+    full_joint_lists = y['joint_names']
+    joint_order = y['joint_ordering']
+    num_chains = len(full_joint_lists)
+
+    # Set up Relaxed IK Python robot
+    arms = []
+    for i in range(num_chains):
+        urdf_robot, arm, arm_c, tree = urdf_load('', '', '', full_joint_lists[i], fixed_ee_joints[i])
+        arms.append(arm)
+    robot = Robot(arms, full_joint_lists, joint_order)
+    init_trans = robot.get_ee_positions(starting_config)[0]
+    init_rot = robot.get_ee_rotations(starting_config)[0]
+
+    return init_trans, init_rot
 
 class BenchmarkEvaluator:
     def __init__(self, waypoints, ja_stream, delta_time, step, root, interface, robot, test_name):

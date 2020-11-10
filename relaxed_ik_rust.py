@@ -264,6 +264,7 @@ def main(args=None):
         while eepg == None: continue
 
         rate = rospy.Rate(3000)
+        speed_list = []
         while not rospy.is_shutdown():
             pose_goals = eepg.ee_poses
             header = eepg.header
@@ -284,7 +285,9 @@ def main(args=None):
             start = timer()
             xopt = lib.solve(pos_arr, len(pos_arr), quat_arr, len(quat_arr))
             end = timer()
-            print("Speed: {}".format(1.0 / (end - start)))
+            speed = 1.0 / (end - start)
+            # print("Speed: {}".format(speed))
+            speed_list.append(speed)
 
             ja = JointAngles()
             ja.header = header
@@ -301,6 +304,11 @@ def main(args=None):
             # print(ja_str)
 
             rate.sleep()
+
+        print("Average speed: {} HZ".format(numpy.mean(speed_list)))
+        print("Std deviation speed: {}".format(numpy.std(speed_list)))
+        print("Min speed: {} HZ".format(numpy.min(speed_list)))
+        print("Max speed: {} HZ".format(numpy.max(speed_list)))
 
 if __name__ == '__main__':
     main()

@@ -20,9 +20,9 @@ import transformations as T
 import yaml
 
 from std_msgs.msg import ColorRGBA, Float64
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Pose
 from interactive_markers.interactive_marker_server import *
-from relaxed_ik_ros1.msg import JointAngles
+from relaxed_ik_ros1.msg import EEPoseGoals, JointAngles
 from sensor_msgs.msg import JointState, PointCloud2, PointField
 from timeit import default_timer as timer
 from visualization_msgs.msg import *
@@ -45,9 +45,86 @@ def time_update_cb(msg):
 #     server.setPose(msg.marker_name, msg.pose)    
 #     server.applyChanges()
 
+# init_pos, init_rot = test_utils.get_init_pose()
+# def goal_marker_cb(msg, args):
+#     server = args
+#     p = msg.ee_poses[0]
+#     pos_goal = numpy.array(init_pos) + numpy.array([p.position.x, p.position.y, p.position.z])
+#     rot_goal = T.quaternion_multiply([p.orientation.w, p.orientation.x, p.orientation.y, p.orientation.z], init_rot)
+#     pose = Pose()
+#     pose.position.x = pos_goal[0]
+#     pose.position.y = pos_goal[1]
+#     pose.position.z = pos_goal[2]
+#     pose.orientation.w = rot_goal[0]
+#     pose.orientation.x = rot_goal[1]
+#     pose.orientation.y = rot_goal[2]
+#     pose.orientation.z = rot_goal[3]
+#     server.setPose("pose_goal", pose)    
+#     server.applyChanges()
+
 def processFeedback(feedback):
     p = feedback.pose.position
     print (feedback.marker_name + " is now at " + str(p.x) + ", " + str(p.y) + ", " + str(p.z))
+
+def makePoseGoalMarker(fixed_frame, init_pos, init_quat):
+    int_marker = InteractiveMarker()
+    int_marker.header.frame_id = fixed_frame
+    int_marker.name = "pose_goal"
+    int_marker.pose.position.x = init_pos[0]
+    int_marker.pose.position.y = init_pos[1]
+    int_marker.pose.position.z = init_pos[2]
+
+    int_marker.pose.orientation.x = init_quat[1]
+    int_marker.pose.orientation.y = init_quat[2]
+    int_marker.pose.orientation.z = init_quat[3]
+    int_marker.pose.orientation.w = init_quat[0]
+
+    int_marker.scale = 0.12
+
+    marker = Marker()
+    marker.color.r = 1.0
+    marker.color.g = 1.0
+    marker.color.b = 0.0
+    marker.color.a = 1.0
+    marker.scale.x = 0.07
+    marker.scale.y = 0.07
+    marker.scale.z = 0.07
+    marker.type = Marker.CUBE
+
+    control =  InteractiveMarkerControl()
+    control.always_visible = True
+    control.markers.append(marker)
+    int_marker.controls.append(control)
+
+    c = 1.0 / numpy.sqrt(2)
+    tx_control = InteractiveMarkerControl()
+    tx_control.orientation.w = c
+    tx_control.orientation.x = c
+    tx_control.orientation.y = 0
+    tx_control.orientation.z = 0
+    tx_control.name = "move_x"
+    tx_control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+    int_marker.controls.append(tx_control)
+
+    mz_control = InteractiveMarkerControl()
+    mz_control.orientation.w = c
+    mz_control.orientation.x = 0
+    mz_control.orientation.y = c
+    mz_control.orientation.z = 0
+    mz_control.name = "move_z"
+    mz_control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+    int_marker.controls.append(mz_control)
+
+    my_control = InteractiveMarkerControl()
+    my_control.orientation.w = c
+    my_control.orientation.x = 0
+    my_control.orientation.y = 0
+    my_control.orientation.z = c
+    my_control.name = "move_y"
+    my_control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+    int_marker.controls.append(my_control)
+
+    return int_marker
 
 def makeMarker(name, fixed_frame, shape, ts, rots, scale, is_dynamic, points=None, mesh_file=None):                
     int_marker = InteractiveMarker()
@@ -318,12 +395,16 @@ def main(args=None):
     server = InteractiveMarkerServer("simple_marker")
     # rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, marker_feedback_cb, server)
 
+    # pose_goal_marker = makePoseGoalMarker(fixed_frame, init_pos, init_rot)
+    # server.insert(pose_goal_marker)
+    # rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, goal_marker_cb, server)
+
     rospy.Subscriber('/relaxed_ik/current_time', Float64, time_update_cb)
     
     dyn_obstacle_handles = []
     args = rospy.myargv(argv=sys.argv)
     if args[1] == "true": 
-        dyn_obstacle_handles = set_collision_world(server, path_to_src, robot_name, fixed_frame, file_name=env_collision_file_name)
+        dyn_obstacle_handles = set_collision_world(server, path_to_src, robot_name, fixed_frame, file_type='rmos', file_name=env_collision_file_name)
 
     prev_sol = starting_config
     delta_time = 0.01
