@@ -75,7 +75,10 @@ def main(args=None):
     else:
         raise NameError('Please define the relevant information of the robot!')
 
-    print("\nSolver initialized!\nObjective mode: {}".format(robot_info['objective_mode']))
+    info_file_name = robot_info['name']
+    robot_name = info_file_name.split('_')[0]
+    objective_mode = robot_info['objective_mode']
+    print("\nRelaxedIK initialized!\nRobot: {}\nObjective mode: {}\n".format(robot_name, objective_mode))
     
     # Publishers
     angles_pub = rospy.Publisher('/relaxed_ik/joint_angle_solutions', JointAngles, queue_size=10)
@@ -84,20 +87,39 @@ def main(args=None):
     # Subscribers
     rospy.Subscriber('/simple_marker/feedback', InteractiveMarkerFeedback, marker_feedback_cb)
     rospy.Subscriber('/simple_marker/update', InteractiveMarkerUpdate, marker_update_cb)
-    
 
-    
+    cur_time = 0.0
+    delta_time = 0.01
+    step = 1 / 30.0
+
+    # Wait for the start signal
+    print("Waiting for ROS param /simulation_time to be set as go...")
+    initialized = False
+    while not initialized: 
+        try: 
+            param = rospy.get_param("simulation_time")
+            initialized = param == "go"
+        except KeyError:
+            initialized = False
+    print("ROS param /simulation_time is set up!\n")
 
     # If the input_device is keyboard
     if robot_info['input_device'] == 'keyboard': 
         global eepg
         rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, eePoseGoals_cb)
 
+        print("Waiting for the keyboard_ikgoal_driver being initialized...")
         while eepg == None: continue
+        print("The keyboard_ikgoal_driver is initialized!\n")
 
         rate = rospy.Rate(3000)
         speed_list = []
         while not rospy.is_shutdown():
+            cur_time_msg = Float64()
+            cur_time_msg.data = cur_time
+            time_pub.publish(cur_time_msg)
+            cur_time += delta_time * step
+
             pose_goals = eepg.ee_poses
             header = eepg.header
             pos_arr = (ctypes.c_double * (3 * len(pose_goals)))()
@@ -138,14 +160,12 @@ def main(args=None):
             rate.sleep()
 
         print("Average speed: {} HZ".format(numpy.mean(speed_list)))
-        print("Std deviation speed: {}".format(numpy.std(speed_list)))
         print("Min speed: {} HZ".format(numpy.min(speed_list)))
         print("Max speed: {} HZ".format(numpy.max(speed_list)))
 
     # When the input is animation file
     else:
          # Load relevant information
-        info_file_name = open(path_to_src + '/relaxed_ik_core/config/loaded_robot', 'r').read()
         info_file_path = path_to_src + '/relaxed_ik_core/config/info_files/' + info_file_name
         info_file = open(info_file_path, 'r')
         y = yaml.load(info_file, Loader=yaml.FullLoader)
@@ -156,11 +176,6 @@ def main(args=None):
         full_joint_lists = y['joint_names']
         joint_order = y['joint_ordering']
         num_chains = len(full_joint_lists)
-
-        objective_mode = robot_info['objective_mode']
-        robot_name = info_file_name.split('_')[0]
-        print("Robot: {}".format(robot_name))
-        print("Objective mode: {}".format(objective_mode))
 
         # Set up Relaxed IK Python robot
         arms = []
@@ -179,22 +194,9 @@ def main(args=None):
             waypoints[-1][1].position.y, waypoints[-1][1].position.z])
         final_rot_goal = T.quaternion_multiply([waypoints[-1][1].orientation.w, waypoints[-1][1].orientation.x, \
             waypoints[-1][1].orientation.y, waypoints[-1][1].orientation.z], init_rot)
-        
-        # Wait for the start signal
-        print("Waiting for ROS param /simulation_time to be set as go...")
-        initialized = False
-        while not initialized: 
-            try: 
-                param = rospy.get_param("simulation_time")
-                initialized = param == "go"
-            except KeyError:
-                initialized = False
 
         # Set up the initial parameters
-        step = 1 / 30.0
         goal_idx = 0
-        cur_time = 0.0
-        delta_time = 0.01
         stuck_count = 0
         max_time = len(waypoints) * delta_time * 2.0
         ja_stream = []

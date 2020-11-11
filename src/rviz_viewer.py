@@ -69,7 +69,7 @@ def print_cb(msg):
     p = msg.pose.position
     print(msg.marker_name + " is now at [" + str(p.x) + ", " + str(p.y) + ", " + str(p.z) + "]")
 
-def make_marker(name, fixed_frame, shape, scale, ts, quat , is_dynamic, 
+def make_marker(name, fixed_frame, shape, scale, ts, quat, is_dynamic, 
                 points=None, color=[0.0,0.5,0.5,1.0], marker_scale=0.3):                
     int_marker = InteractiveMarker()
     int_marker.header.frame_id = fixed_frame
@@ -142,7 +142,8 @@ def make_marker(name, fixed_frame, shape, scale, ts, quat , is_dynamic,
         control.markers.append(marker)
         int_marker.controls.append(control)
 
-    if is_dynamic:
+    # 1 means that this obstacle is interactive
+    if is_dynamic == 1:
         c = 1.0 / numpy.sqrt(2)
         tx_control = InteractiveMarkerControl()
         tx_control.orientation.w = c
@@ -213,12 +214,18 @@ def set_collision_world(server, fixed_frame, env_settings):
         cuboids = obstacles['cuboids']
         if cuboids is not None:
             for c in cuboids:
-                is_dynamic = c['animation'] != 'static'
+                if c['animation'] == 'static':
+                    is_dynamic = 0
+                elif c['animation'] == 'interactive':
+                    is_dynamic = 1
+                else:
+                    is_dynamic = 2
+                
                 c_quat = T.quaternion_from_euler(c['rotation'][0], c['rotation'][1], c['rotation'][2])
                 int_marker = make_marker(c['name'], fixed_frame, "cuboid", c['scale'], 
                                         c['translation'], c_quat, is_dynamic)
                 server.insert(int_marker, print_cb)
-                if is_dynamic:
+                if is_dynamic == 2:
                     path = animation_folder_path + c['animation']
                     relative_waypoints = utils.read_cartesian_path(path)
                     waypoints = utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
@@ -228,11 +235,16 @@ def set_collision_world(server, fixed_frame, env_settings):
         spheres = obstacles['spheres']
         if spheres is not None:
             for s in spheres:
-                is_dynamic = s['animation'] != 'static'
+                if s['animation'] == 'static':
+                    is_dynamic = 0
+                elif s['animation'] == 'interactive':
+                    is_dynamic = 1
+                else:
+                    is_dynamic = 2
                 int_marker = make_marker(s['name'], fixed_frame, "sphere", [s['scale']] * 3, 
                                         s['translation'], [1.0,0.0,0.0,0.0], is_dynamic)
                 server.insert(int_marker, print_cb)
-                if is_dynamic:
+                if is_dynamic == 2:
                     path = animation_folder_path + s['animation']
                     relative_waypoints = utils.read_cartesian_path(path)
                     waypoints = utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
@@ -256,11 +268,16 @@ def set_collision_world(server, fixed_frame, env_settings):
                             point.z = float(pt[2]) * pc_scale[2]
                             pc_points.append(point)
                 
-                is_dynamic = pc['animation'] != 'static'
+                if pc['animation'] == 'static':
+                    is_dynamic = 0
+                elif pc['animation'] == 'interactive':
+                    is_dynamic = 1
+                else:
+                    is_dynamic = 2
                 pc_quat = T.quaternion_from_euler(pc['rotation'][0], pc['rotation'][1], pc['rotation'][2])
                 int_marker = make_marker(pc['name'], fixed_frame, "point_cloud", [0.01, 0.01, 0.01], pc['translation'], pc_quat, is_dynamic, points=pc_points)
                 server.insert(int_marker, print_cb)
-                if is_dynamic:
+                if is_dynamic == 2:
                     path = animation_folder_path + pc['animation']
                     relative_waypoints = utils.read_cartesian_path(path)
                     waypoints = utils.get_abs_waypoints(relative_waypoints, int_marker.pose)
