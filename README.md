@@ -4,7 +4,7 @@ This is the ROS wrapper of RelaxedIK solver. Here is the project page that has m
 
 This is a lighter-weight version of RelaxedIK wrapped up in ROS1 with pre-generated config files of some mostly used robot arms. A keyboard pose goal driver and a rviz viewer are included in this wrapper for you to play with. However, you will not be able to customize your own config files in this wrapper. You can go to this link instead [relaxed_ik](https://github.com/uwgraphics/relaxed_ik) for the complete version. In the complete version, you will have the opportunity to (and have to) set up everything from scratch, including importing a urdf, configuring the collision files, and training the neural network, etc. The complete version is recommended if you would like to work on the configuration process yourself or a robot that we didn’t include in the available options; otherwise, this wrapper is likely to make your life much easier since everything you need to do will be setting the name of the robot you would like to work with.
 
-**UPDATE:** Based on our CollisionIK paper, we add the feature of simultaneously avoiding collisions with static or dynamic obstacles in the environment to RelaxedIK. This method effectively incorporates environment collision avoidance as a single term in this multi-objective, optimization-based IK structure, and provide solutions for how to spatially represent and organize external environments such that data can be efficiently passed to a real-time, performancecritical optimization loop.
+**UPDATE:** Based on our CollisionIK paper, we add the feature of simultaneously avoiding collisions with static or dynamic obstacles in the environment to RelaxedIK. This method effectively incorporates environment collision avoidance as a single term in this multi-objective, optimization-based IK structure, and provide solutions for how to spatially represent and organize external environments such that data can be efficiently passed to a real-time, performance critical optimization loop.
 
 ## Dependencies
 ### Python Dependencies (Not Optional)
@@ -119,4 +119,3 @@ To use this wrapper, you will first need to install Rust. Please go to https://w
 		8 - rotate chain 2 around +Z
 		7 - rotate chain 2 around -Z
 		```
-		
