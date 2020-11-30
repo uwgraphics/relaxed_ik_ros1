@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
 <launch>
-   <node pkg="relaxed_ik_ros1" type="rviz_viewer.py" name="rviz_viewer" output="screen"/>
+    <arg name="show_obstacles" default="true"/>
+    <node pkg="relaxed_ik_ros1" type="rviz_viewer.py" name="rviz_viewer" output="screen" args="$(arg show_obstacles)"/>
 </launch>
