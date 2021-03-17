@@ -375,7 +375,9 @@ def main():
             else:
                 prev_sol = xopt
 
-        js = joint_state_define(xopt)
+        loc = {'x': xopt}
+        exec(joint_state_define + "\njs = joint_state_define(x)", globals(), loc)
+        js = loc["js"]
         if js == None:
             js = JointState()
             js.name = joint_ordering
