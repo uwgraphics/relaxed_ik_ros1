@@ -1,11 +1,14 @@
 # Relaxed IK ROS1
 
 ## Introduction
-Relaxed IK ROS1 has the complete set of features available in the Relaxed IK family and it is also where [Collision IK](https://arxiv.org/abs/2102.13187) and Pathwise Collision IK (In development) reside. If you doesn't have strong preferences over any specific wrapper, you probably should consider this ROS1 wrapper as the first choice. A keyboard pose goal driver and an rviz viewer are provided for driving the robot's end-effector around in a simulated environment. 
+
+You can find an introduction and the citation information of RelaxedIK in the README of [RelaxedIK Core](https://github.com/uwgraphics/relaxed_ik_core) which is a submodule of this repo. It is recommended to look at [RelaxedIK Core](https://github.com/uwgraphics/relaxed_ik_core) before working with this wrapper.
+
+Relaxed IK ROS1 has the complete set of features available in the Relaxed IK family and it is also where [CollisionIK](https://arxiv.org/abs/2102.13187) and Pathwise CollisionIK (In development) reside. If you doesn't have strong preferences over any specific wrapper, you probably should consider this ROS1 wrapper as the first choice. A keyboard pose goal driver and an rviz viewer are provided for driving the robot's end-effector around in a simulated environment. 
 
 ## Relaxed IK Family
 
-More information about Relaxed IK, Collision IK, and all the wrappers could be found in this [documentation](https://uwgraphics.github.io/relaxed_ik_core/).
+More information about Relaxed IK, CollisionIK, and all the wrappers could be found in this [documentation](https://uwgraphics.github.io/relaxed_ik_core/).
 
 - [Relaxed IK (Deprecated)](https://github.com/uwgraphics/relaxed_ik/tree/dev)
 - [Relaxed IK Core](https://github.com/uwgraphics/relaxed_ik_core)
@@ -17,7 +20,7 @@ More information about Relaxed IK, Collision IK, and all the wrappers could be f
 ||**Relaxed IK (Deprecated)**|**Relaxed IK ROS1**|**Relaxed IK Unity**|**Relaxed IK Coppeliasim**|**Relaxed IK Mujoco**|  
 |:------|:-----|:-----|:-----|:-----|:-----| 
 |**Relaxed IK**|:o:|:o:|:o:|:o:|:o:|  
-|**Collision IK**|:x:|:o:|:x:|:x:|:x:|  
+|**CollisionIK**|:x:|:o:|:x:|:x:|:x:|  
 
 ## Dependencies
 
@@ -63,24 +66,24 @@ To use this wrapper, you will first need to install Rust. Please go to https://w
         - 1 info file <sawyer_info.yaml> in the *info_files* folder
         - 1 joint state function file <sawyer_joint_state_define> in the *joint_state_define_functions* folder
         - 1 urdf file <sawyer.urdf> in the *urdfs* folder.
-    2. Look at <settings.yaml> in the *config* folder and follow the instructions there on how to customize the parameters, change the input device, and manage the environment obstacles.
-    3. Compile the core:
+    1. Compile the core:
         ```bash
         cargo build
         ```
-2. View the robot arm in rviz by typing the following command:
+1. Look at <settings.yaml> in the folder *relaxed_ik_core/config* and follow the instructions there to customize the parameters, change the input device, and manage the environment obstacles. Note that you don't need to recompile *relaxed_ik_core* every time you change the parameters in <settings.yaml>.
+1. View the robot arm in rviz by typing the following command:
     ```bash
     roslaunch relaxed_ik_ros1 rviz_viewer.launch
     ```
-3. Launch the Relaxed IK solver by typing the following command:
+1. Launch the Relaxed IK solver by typing the following command:
     ```bash
     roslaunch relaxed_ik_ros1 relaxed_ik_rust.launch
     ```
-4. Set a ROS parameter to start the simulation:
+1. Set a ROS parameter to start the simulation:
     ```bash
     rosparam set /simulation_time go
     ```
-5. Control the robot based on the type of input device in <settings.yaml>. If you set the robot follow a given cartesian path, you should see the robot moving now! If you set the input_device to be keyboard, initialize the keyboard IK goal driver in a new terminal:
+1. **[For Testing purposes]** Control the robot based on the type of input device in <settings.yaml>. If you set the robot follow a given cartesian trajectories, you should see the robot moving now! Some examples of cartesian trajectories are provided in the folder *animation_files*. If you set the `input_device` to be keyboard, initialize the keyboard IK goal driver in a new terminal. The driver listens to 6-DOF pose goals and publishes robot joint angles.
     ```bash
     rosrun relaxed_ik_ros1 keyboard_ikgoal_driver.py
     ```
@@ -115,4 +118,4 @@ To use this wrapper, you will first need to install Rust. Please go to https://w
     ```
 
 ### Existing Issues
-- This wrapper only support the XYZ-like point cloud file format currently. Please refer to the geometry files in the folder `geometry_files` for some examples.
+- This wrapper only support the XYZ-like point cloud file format currently. Please refer to the geometry files in the folder *geometry_files* for some examples.
