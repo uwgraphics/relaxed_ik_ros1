@@ -19,62 +19,9 @@ from kdl_parser import kdl_tree_from_urdf_model
 import PyKDL as kdl
 from robot import Robot
 
-class Opt(ctypes.Structure):
-    _fields_ = [("data", ctypes.POINTER(ctypes.c_double)), ("length", ctypes.c_int)]
-
-class RelaxedIKS(ctypes.Structure):
-    pass
-
 path_to_src = rospkg.RosPack().get_path('relaxed_ik_ros1') + '/relaxed_ik_core'
-lib = ctypes.cdll.LoadLibrary(path_to_src + '/target/debug/librelaxed_ik_lib.so')
-
-lib.relaxed_ik_new.restype = ctypes.POINTER(RelaxedIKS)
-lib.solve.argtypes = [ctypes.POINTER(RelaxedIKS), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double)]
-lib.solve.restype = Opt
-lib.solve_position.argtypes = [ctypes.POINTER(RelaxedIKS), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.c_int]
-lib.solve_position.restype = Opt
-lib.solve_velocity.argtypes = [ctypes.POINTER(RelaxedIKS), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.c_int]
-lib.solve_velocity.restype = Opt
-
-class RelaxedIKRust:
-    def __init__(self, setting_file_path = None):
-        if setting_file_path is None:
-            self.obj = lib.relaxed_ik_new(ctypes.c_char_p())
-        else:
-            self.obj = lib.relaxed_ik_new(ctypes.c_char_p(setting_file_path.encode('utf-8')))
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        lib.relaxed_ik_free(self.obj)
-    
-    def solve_position(self, positions, orientations, tolerances):
-        pos_arr = (ctypes.c_double * len(positions))()
-        quat_arr = (ctypes.c_double * len(orientations))()
-        tole_arr = (ctypes.c_double * len(tolerances))()
-        for i in range(len(positions)):
-            pos_arr[i] = positions[i]
-        for i in range(len(orientations)):
-            quat_arr[i] = orientations[i]
-        for i in range(len(tolerances)):
-            tole_arr[i] = tolerances[i]
-        xopt = lib.solve_position(self.obj, pos_arr, len(pos_arr), quat_arr, len(quat_arr), tole_arr, len(tole_arr))
-        return xopt.data[:xopt.length]
-    
-    def solve_velocity(self, linear_velocities, angular_velocities, tolerances):
-        linear_arr = (ctypes.c_double * len(linear_velocities))()
-        angular_arr = (ctypes.c_double * len(angular_velocities))()
-        tole_arr = (ctypes.c_double * len(tolerances))()
-        for i in range(len(linear_velocities)):
-            linear_arr[i] = linear_velocities[i]
-        for i in range(len(angular_velocities)):
-            angular_arr[i] = angular_velocities[i]
-        for i in range(len(tolerances)):
-            tole_arr[i] = tolerances[i]
-        xopt = lib.solve_velocity(self.obj, linear_arr, len(linear_arr), angular_arr, len(angular_arr), tole_arr, len(tole_arr))
-        return xopt.data[:xopt.length]
-
-    def get_ee_positions(self):
-        xopt = lib.get_ee_positions(self.obj)
-        return xopt.data[:xopt.length]
+sys.path.insert(1, path_to_src + '/wrappers')
+from python_wrapper import RelaxedIKRust
 
 class RelaxedIK:
     def __init__(self):
@@ -177,7 +124,7 @@ class RelaxedIK:
             orientations.append(msg.ee_poses[i].orientation.y)
             orientations.append(msg.ee_poses[i].orientation.z)
             orientations.append(msg.ee_poses[i].orientation.w)
-            if i > len(msg.tolerances):
+            if i < len(msg.tolerances):
                 tolerances.append(msg.tolerances[i].linear.x)
                 tolerances.append(msg.tolerances[i].linear.y)
                 tolerances.append(msg.tolerances[i].linear.z)
@@ -209,7 +156,7 @@ class RelaxedIK:
             angular_vels.append(msg.ee_vels[i].angular.x)
             angular_vels.append(msg.ee_vels[i].angular.y)
             angular_vels.append(msg.ee_vels[i].angular.z)
-            if i > len(msg.tolerances):
+            if i < len(msg.tolerances):
                 tolerances.append(msg.tolerances[i].linear.x)
                 tolerances.append(msg.tolerances[i].linear.y)
                 tolerances.append(msg.tolerances[i].linear.z)
