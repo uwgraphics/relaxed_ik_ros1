@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="setting_file_path" default="" />
+    <param name="setting_file_path" value="$(arg setting_file_path)" />
+
+    <node pkg="relaxed_ik_ros1" type="relaxed_ik_rust.py" name="relaxed_ik_rust" output="screen" />
+
+    <node pkg="relaxed_ik_ros1" type="rviz_viewer.py" name="rviz_viewer" output="screen" />
+</launch>

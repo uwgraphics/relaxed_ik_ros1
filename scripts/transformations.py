@@ -1483,7 +1483,33 @@ def quaternion_to_axisAngle(q):
     axis[1] = q[2] / max(math.sqrt(1 - t), 0.000000001)
     axis[2] = q[3] / max(math.sqrt(1 - t), 0.000000001)
 
+    while angle > math.pi:
+        angle -= 2.0*math.pi
+    while angle < -math.pi:
+        angle += 2.0*math.pi
+
     return axis, angle
+
+# added by Yeping
+def quaternion_to_scaledAxis(q):
+    axis, angle = quaternion_to_axisAngle(q)
+    return numpy.array(axis) * angle
+
+# added by Yeping
+def quaternion_from_scaledAxis(v):
+    angle = numpy.linalg.norm(v)
+    if abs(angle) < _EPS:
+        return [1.0, 0.0, 0.0, 0.0]
+    axis = numpy.array(v) / angle
+    return quaternion_from_axisAngle(axis, angle)
+
+def quaternion_from_axisAngle(axis, angle):
+    s = math.sin(angle/2);
+    x = axis[0] * s;
+    y = axis[1] * s;
+    z = axis[2] * s;
+    w = math.cos(angle/2);
+    return [w, x, y, z]
 
 # added by Danny Rakita
 def rotate_quaternion_representation(q, rot_mat):
@@ -1894,7 +1920,6 @@ def vector_product(v0, v1, axis=0):
 
     """
     return numpy.cross(v0, v1, axis=axis)
-
 
 def angle_between_vectors(v0, v1, directed=True, axis=0):
     """Return angle between vectors.

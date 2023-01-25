@@ -51,7 +51,7 @@ find_package(catkin REQUIRED COMPONENTS std_msgs message_generation geometry_msg
 add_message_files(
    FILES
    EEPoseGoals.msg
-   JointAngles.msg
+   EEVelGoals.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -62,9 +62,8 @@ add_message_files(
 # )
 add_service_files(
    FILES
-   RelaxedIKSolution.srv
-   IKSolution.srv
-   SelfCollisionQuery.srv
+   IKPose.srv
+   IKVelocity.srv
 )
 
 ## Generate actions in the 'action' folder
