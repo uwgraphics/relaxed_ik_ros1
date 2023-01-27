@@ -58,8 +58,9 @@ class Robot():
                 if joint.getType() != 8:
                     self.articulated_joint_names.append(joint.getName())
 
-        assert len(self.articulated_joint_names) == len(settings['starting_config']), \
-                    "Number of joints parsed from urdf should be the same with the starting config in the setting file."
+        if 'starting_config' in settings:
+            assert len(self.articulated_joint_names) == len(settings['starting_config']), \
+                        "Number of joints parsed from urdf should be the same with the starting config in the setting file."
 
         self.arm_chains = []
         self.fk_p_kdls = []

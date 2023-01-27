@@ -55,8 +55,14 @@ class RelaxedIK:
         self.js_msg = JointState()
         self.js_msg.name = self.robot.articulated_joint_names
         self.js_msg.position = []
-        for i in range(len(self.js_msg.name)):
-            self.js_msg.position.append( settings['starting_config'][i] )
+
+        if 'starting_config' not in settings:
+            settings['starting_config'] = [0.0] * len(self.js_msg.name)
+        else:
+            assert len(settings['starting_config']) == len(self.js_msg.name), \
+                    "Starting config length does not match the number of joints"
+            for i in range(len(self.js_msg.name)):
+                self.js_msg.position.append( settings['starting_config'][i] )
         
         # Subscribers
         rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, self.pose_goals_cb)

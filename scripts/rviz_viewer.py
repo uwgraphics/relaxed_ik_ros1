@@ -19,7 +19,6 @@ from sensor_msgs.msg import JointState, PointCloud2, PointField
 from visualization_msgs.msg import *
 import subprocess
 from urdf_parser_py.urdf import URDF
-from kdl_parser import kdl_tree_from_urdf_model
 from geometry_msgs.msg import Point
 from relaxed_ik_ros1.msg import EEPoseGoals, EEVelGoals
 
@@ -56,6 +55,12 @@ class RvizViewer:
 
         # Markers to visualize goal poses
         self.server = InteractiveMarkerServer("simple_marker")
+
+        if 'starting_config' not in settings:
+            settings['starting_config'] = [0] * len(self.robot.articulated_joint_names)
+        else:
+            self.starting_config = settings['starting_config']
+
         self.ee_poses =  self.robot.fk(settings['starting_config'])
         for i in range(self.robot.num_chain):
             pose_goal_marker = make_marker('arm_'+str(i), settings['base_links'][i],
