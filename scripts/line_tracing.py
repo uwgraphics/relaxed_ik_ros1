@@ -16,6 +16,7 @@ import think_ahead_ik.srv
 from timeit import default_timer as timer
 from geometry_msgs.msg import Pose, Twist, Vector3
 from relaxed_ik_ros1.msg import EEPoseGoals, EEVelGoals
+from relaxed_ik_ros1.srv import IKPoseRequest,  IKPose
 from robot import Robot
 
 path_to_src = rospkg.RosPack().get_path('relaxed_ik_ros1') + '/relaxed_ik_core'
@@ -27,6 +28,16 @@ class TraceALine:
         except:
             print("No tolerances are given, using zero tolerances")
             tolerances = [0, 0, 0, 0, 0, 0]
+
+        try:
+            self.use_topic_not_service = rospy.get_param('~use_topic_not_service')
+        except:
+            self.use_topic_not_service = False
+
+        try: 
+            self.loop = rospy.get_param('~loop')
+        except:
+            self.loop = False
         
         self.tolerances = []
 
@@ -56,7 +67,12 @@ class TraceALine:
         self.starting_ee_poses =  self.robot.fk(settings['starting_config'])
 
         self.trajectory = self.generate_trajectory()
-        self.ee_pose_pub = rospy.Publisher('relaxed_ik/ee_pose_goals', EEPoseGoals, queue_size=5)
+
+        if self.use_topic_not_service:
+            self.ee_pose_pub = rospy.Publisher('relaxed_ik/ee_pose_goals', EEPoseGoals, queue_size=5)
+        else:
+            rospy.wait_for_service('relaxed_ik/solve_pose')
+            self.ik_pose_service = rospy.ServiceProxy('relaxed_ik/solve_pose', IKPose)
 
         count_down_rate = rospy.Rate(1)
         count_down = 3
@@ -114,17 +130,33 @@ class TraceALine:
 
     def timer_callback(self, event):
         if self.trajectory_index >= len(self.trajectory):
-            self.timer.shutdown()
+            if self.loop:
+                print("Trajectory finished, looping")
+                self.trajectory_index = 0
+            else:
+                rospy.signal_shutdown("Trajectory finished")
             return
 
-        ee_pose_goals = EEPoseGoals()
-        for i in range(self.robot.num_chain):
-            ee_pose_goals.ee_poses.append(self.trajectory[self.trajectory_index][i])
-            if i < len(self.tolerances):
-                ee_pose_goals.tolerances.append(self.tolerances[i])
-            else:
-                ee_pose_goals.tolerances.append(self.tolerances[0])
-        self.ee_pose_pub.publish(ee_pose_goals)
+        if self.use_topic_not_service:
+            ee_pose_goals = EEPoseGoals()
+            for i in range(self.robot.num_chain):
+                ee_pose_goals.ee_poses.append(self.trajectory[self.trajectory_index][i])
+                if i < len(self.tolerances):
+                    ee_pose_goals.tolerances.append(self.tolerances[i])
+                else:
+                    ee_pose_goals.tolerances.append(self.tolerances[0])
+            self.ee_pose_pub.publish(ee_pose_goals)
+        else:
+            req = IKPoseRequest()
+            for i in range(self.robot.num_chain):
+                req.ee_poses.append(self.trajectory[self.trajectory_index][i])
+                if i < len(self.tolerances):
+                    req.tolerances.append(self.tolerances[i])
+                else:
+                    req.tolerances.append(self.tolerances[0])
+            
+            ik_solutions = self.ik_pose_service(req)
+
         self.trajectory_index += 1
 
 if __name__ == '__main__':

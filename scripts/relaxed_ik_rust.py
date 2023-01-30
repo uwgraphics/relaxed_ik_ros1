@@ -27,10 +27,16 @@ class RelaxedIK:
     def __init__(self):
         deault_setting_file_path = path_to_src + '/configs/settings.yaml'
 
-        setting_file_path = rospy.get_param('setting_file_path')
-        if setting_file_path == '':
+        try:
+            setting_file_path = rospy.get_param('setting_file_path')
+        except:
             print("Rviz viewer: no setting file path is given, using default setting files --" + setting_file_path)
             setting_file_path = deault_setting_file_path
+
+        try: 
+            self.use_visualization = rospy.get_param('~use_visualization')
+        except:
+            self.use_visualization = False
 
         os.chdir(path_to_src )
 
@@ -49,7 +55,9 @@ class RelaxedIK:
 
         # Publishers
         self.angles_pub = rospy.Publisher('relaxed_ik/joint_angle_solutions', JointState, queue_size=1)
-   
+        if self.use_visualization:
+            self.vis_ee_pub = rospy.Publisher('relaxed_ik/vis_ee_poses', EEPoseGoals, queue_size=1)
+
         self.robot = Robot(setting_file_path)
 
         self.js_msg = JointState()
@@ -90,7 +98,7 @@ class RelaxedIK:
             orientations.append(req.ee_poses[i].orientation.y)
             orientations.append(req.ee_poses[i].orientation.z)
             orientations.append(req.ee_poses[i].orientation.w)
-            if i > len(req.tolerances):
+            if i < len(req.tolerances):
                 tolerances.append(req.tolerances[i].linear.x)
                 tolerances.append(req.tolerances[i].linear.y)
                 tolerances.append(req.tolerances[i].linear.z)
@@ -100,6 +108,12 @@ class RelaxedIK:
             else:
                 for j in range(6):
                     tolerances.append(0.0)
+
+        if self.use_visualization:
+            vis_msg = EEPoseGoals()
+            vis_msg.ee_poses = req.ee_poses
+            vis_msg.tolerances = req.tolerances
+            self.vis_ee_pub.publish(vis_msg)
 
         ik_solution = self.relaxed_ik.solve_position(positions, orientations, tolerances)
 
@@ -141,10 +155,7 @@ class RelaxedIK:
                 for j in range(6):
                     tolerances.append(0.0)
 
-        before = rospy.get_rostime()
         ik_solution = self.relaxed_ik.solve_position(positions, orientations, tolerances)
-        after = rospy.get_rostime()
-        duration = after - before 
 
         # Publish the joint angle solution
         self.js_msg.header.stamp = rospy.Time.now()
@@ -173,10 +184,7 @@ class RelaxedIK:
                 for j in range(6):
                     tolerances.append(0.0)
 
-        before = rospy.get_rostime()
         ik_solution = self.relaxed_ik.solve_velocity(linear_vels, angular_vels, tolerances)
-        after = rospy.get_rostime()
-        duration = after - before 
 
         assert len(ik_solution) == len(self.robot.articulated_joint_names)
 

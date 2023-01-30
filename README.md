@@ -32,6 +32,8 @@ To use this wrapper, you will first need to install Rust. Please go to https://w
 
     Spot arm: https://github.com/heuristicus/spot_ros
 
+    Baxter: https://github.com/RethinkRobotics/baxter_common  
+
 3. ```catkin_make```
 4. Start a demo with ur5
     ```bash
@@ -41,7 +43,7 @@ To use this wrapper, you will first need to install Rust. Please go to https://w
     ```bash
     roslaunch relaxed_ik_ros1 demo.launch setting_file_path:=<your absolute path to the setting file> 
    
-5. To move the robot using keyboard, open a new terminal
+5a. To move the robot using keyboard, open a new terminal
     ```bash
     rosrun relaxed_ik_ros1 keyboard_ikgoal_driver.py
     ```
@@ -61,3 +63,10 @@ To use this wrapper, you will first need to install Rust. Please go to https://w
     5 - rotate chain 1 around +Z
     6 rotate chain 1 around -Z
     ```
+5b. TO trace a predefined trajectory
+```bash
+rosrun relaxed_ik_ros1 line_tracing.py _tolerances:=[0,0,0,0,0,999]
+```
+which allows the end-effector to freely rotate allow the z axis. 
+If you don't want to use tolerances, set the _tolerances arguments to all zeros. 
+The script use ROS service by default. To use ROS topic, set parameter `_use_topic_not_service:=True` 

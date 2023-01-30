@@ -81,7 +81,7 @@ class Robot():
             self.num_jnts.append(arm_chain.getNrOfJoints())
 
     def fk_single_chain(self, fk_p_kdl, joint_angles, num_jnts):
-        assert len(joint_angles) == num_jnts
+        assert len(joint_angles) == num_jnts, "length of input: {}, number of joints: {}".format(len(joint_angles), num_jnts)
     
         kdl_array = PyKDL.JntArray(num_jnts)
         for idx in range(num_jnts):
@@ -110,6 +110,7 @@ class Robot():
         for i in range(self.num_chain):
             r += self.num_jnts[i]
             pose = self.fk_single_chain(self.fk_p_kdls[i], joint_angles[l:r], self.num_jnts[i])
+            l = r
             poses.append(pose)
         
         return poses

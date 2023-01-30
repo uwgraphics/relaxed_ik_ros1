@@ -78,6 +78,7 @@ class RvizViewer:
         self.js_pub.publish(self.js_msg)
 
         rospy.Subscriber('/relaxed_ik/joint_angle_solutions', JointState, self.ja_solution_cb)
+        rospy.Subscriber('/relaxed_ik/vis_ee_poses', EEPoseGoals, self.ee_pose_goal_cb)
         rospy.Subscriber('/relaxed_ik/ee_pose_goals', EEPoseGoals, self.ee_pose_goal_cb)
         rospy.Subscriber('/relaxed_ik/ee_vel_goals', EEVelGoals, self.ee_vel_goal_cb)
 
@@ -92,7 +93,7 @@ class RvizViewer:
         for i in range(self.robot.num_chain):
             self.ee_poses[i] = msg.ee_poses[i]
         self.update_marker()
-    
+
     def ee_vel_goal_cb(self, msg):
         assert len(msg.ee_vels) == self.robot.num_chain
         for i in range(self.robot.num_chain):
