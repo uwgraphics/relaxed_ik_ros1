@@ -25,13 +25,17 @@ from python_wrapper import RelaxedIKRust
 
 class RelaxedIK:
     def __init__(self):
-        deault_setting_file_path = path_to_src + '/configs/settings.yaml'
+        rospy.sleep(1)
 
-        try:
-            setting_file_path = rospy.get_param('setting_file_path')
-        except:
-            print("Rviz viewer: no setting file path is given, using default setting files --" + setting_file_path)
-            setting_file_path = deault_setting_file_path
+        default_setting_file_path = path_to_src + '/configs/settings.yaml'
+
+        print("deault_setting_file_path: ", default_setting_file_path)
+
+        setting_file_path = rospy.get_param('setting_file_path')
+
+        if setting_file_path == "":
+            print("Rviz viewer: no setting file path is given, using the default setting file -- {}".format(default_setting_file_path))
+            setting_file_path = default_setting_file_path
 
         try: 
             self.use_visualization = rospy.get_param('~use_visualization')
@@ -41,6 +45,8 @@ class RelaxedIK:
         os.chdir(path_to_src )
 
         # Load the infomation
+        
+        print("setting_file_path: ", setting_file_path)
         setting_file = open(setting_file_path, 'r')
         settings = yaml.load(setting_file, Loader=yaml.FullLoader)
        

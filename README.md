@@ -35,7 +35,7 @@ To use this wrapper, you will first need to install Rust. Please go to https://w
     Baxter: https://github.com/RethinkRobotics/baxter_common  
 
 3. ```catkin_make```
-4. Start a demo with ur5
+4. Start a demo with the Sawyer robot
     ```bash
     roslaunch relaxed_ik_ros1 demo.launch
     ```
