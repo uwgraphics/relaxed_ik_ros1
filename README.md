@@ -41,28 +41,32 @@ To use this wrapper, you will first need to install Rust. Please go to https://w
     ```
     if you want use a different robot, pass the absolute path to the setting file as an argument
     ```bash
-    roslaunch relaxed_ik_ros1 demo.launch setting_file_path:=<your absolute path to the setting file> 
-   
+    roslaunch relaxed_ik_ros1 demo.launch setting_file_path:=<your absolute path to the setting file>
+    ``` 
+
 5a. To move the robot using keyboard, open a new terminal
-    ```bash
-    rosrun relaxed_ik_ros1 keyboard_ikgoal_driver.py
-    ```
-    Please ensure that the termainal window where <keyboard_ikgoal_driver.py> was run from has focus (i.e., make sure it's clicked), then use the following keystrokes:
-    ```bash
-    c - kill the controller controller script
-    w - move chain 1 along +X
-    x - move chain 1 along -X
-    a - move chain 1 along +Y
-    d - move chain 1 along -Y
-    q - move chain 1 along +Z
-    z - move chain 1 along -Z
-    1 - rotate chain 1 around +X
-    2 - rotate chain 1 around -X
-    3 - rotate chain 1 around +Y
-    4 - rotate chain 1 around -Y
-    5 - rotate chain 1 around +Z
-    6 rotate chain 1 around -Z
-    ```
+
+```bash
+rosrun relaxed_ik_ros1 keyboard_input.py
+```
+
+And then use the folloing commands to move the robot.
+```bash
+c - kill the controller controller script
+w - move chain 1 along +X
+x - move chain 1 along -X
+a - move chain 1 along +Y
+d - move chain 1 along -Y
+q - move chain 1 along +Z
+z - move chain 1 along -Z
+1 - rotate chain 1 around +X
+2 - rotate chain 1 around -X
+3 - rotate chain 1 around +Y
+4 - rotate chain 1 around -Y
+5 - rotate chain 1 around +Z
+6 rotate chain 1 around -Z
+```
+    
 5b. TO trace a predefined trajectory
 ```bash
 rosrun relaxed_ik_ros1 line_tracing.py _tolerances:=[0,0,0,0,0,999]
