@@ -10,9 +10,6 @@ import sys
 import transformations as T
 import yaml
 
-import ranged_ik.msg 
-import ranged_ik.srv
-import think_ahead_ik.srv
 from timeit import default_timer as timer
 from geometry_msgs.msg import Pose, Twist, Vector3
 from relaxed_ik_ros1.msg import EEPoseGoals, EEVelGoals

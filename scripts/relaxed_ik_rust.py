@@ -134,11 +134,11 @@ class RelaxedIK:
         return res
 
     def reset_cb(self, msg):
-        n = len(msg.positions)
+        n = len(msg.position)
         x = (ctypes.c_double * n)()
         for i in range(n):
-            x[i] = msg.positions[i]
-        self.relaxed_ik.reset(x, n)
+            x[i] = msg.position[i]
+        self.relaxed_ik.reset(x)
 
     def pose_goals_cb(self, msg):
         positions = []
