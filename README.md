@@ -1,10 +1,22 @@
-# Relaxed IK ROS1
+# Ranged IK ROS1
 
 ## Introduction
 
-You can find an introduction and the citation information of RelaxedIK in the README of [RelaxedIK Core](https://github.com/uwgraphics/relaxed_ik_core) which is a submodule of this repo. It is recommended to look at [RelaxedIK Core](https://github.com/uwgraphics/relaxed_ik_core) before working with this wrapper.
+You can find an introduction and the citation information of RangedIK in the README of [RelaxedIK Core](https://github.com/uwgraphics/relaxed_ik_core/tree/ranged-ik) which is a submodule of this repo. It is recommended to look at [RelaxedIK Core](https://github.com/uwgraphics/relaxed_ik_core/tree/ranged-ik) before working with this wrapper.
 
-[Introduction place holder]
+## The RelaxedIK Family
+[RangedIK](https://github.com/uwgraphics/relaxed_ik_core/tree/ranged-ik) extends [RelaxedIK](https://github.com/uwgraphics/relaxed_ik_core/tree/relaxed-ik) by leveraging the flexibility afforded by tolerances. Also, RangedIK is recently maintained and works with more recent rust versions.
+
+[CollisionIK](https://github.com/uwgraphics/relaxed_ik_core/tree/collision-ik) extends [RelaxedIK](https://github.com/uwgraphics/relaxed_ik_core/tree/relaxed-ik) by avoiding collisions with static or dynamic obstacles in the environment.
+
+We provide a series of wrappers for our tools to be used in various platform or software. 
+
+||**ROS1**|**ROS2**|**WebAssembly**|**Coppeliasim**|**Mujoco**|  
+|:------|:-----|:-----|:-----|:-----|:-----| 
+|**RangedIK**|[link](https://github.com/uwgraphics/relaxed_ik_ros1/tree/ranged-ik)|[link](https://github.com/uwgraphics/relaxed_ik_ros2)|[link](https://github.com/yepw/relaxed-ik-web-demo/)|x|x|  
+|**CollisionIK**|[link](https://github.com/uwgraphics/relaxed_ik_ros1/)|x|x|x|x|  
+|**RelaxedIK**|[link](https://github.com/uwgraphics/relaxed_ik_ros1/)|x|x|[link](https://github.com/uwgraphics/relaxed_ik_coppeliasim)|[link](https://github.com/uwgraphics/relaxed_ik_mujoco)|  
+
 
 ## Dependencies
 
@@ -67,7 +79,7 @@ z - move chain 1 along -Z
 6 rotate chain 1 around -Z
 ```
     
-5b. TO trace a predefined trajectory
+5b. To trace a predefined trajectory
 ```bash
 rosrun relaxed_ik_ros1 line_tracing.py _tolerances:=[0,0,0,0,0,999]
 ```
