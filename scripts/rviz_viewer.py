@@ -26,12 +26,13 @@ path_to_src = rospkg.RosPack().get_path('relaxed_ik_ros1') + '/relaxed_ik_core'
 
 class RvizViewer:
     def __init__(self):
-        deault_setting_file_path = path_to_src + '/configs/settings.yaml'
+        default_setting_file_path = path_to_src + '/configs/settings.yaml'
 
         setting_file_path = rospy.get_param('setting_file_path')
+
         if setting_file_path == '':
             print("Rviz viewer: no setting file path is given, using default setting files --" + setting_file_path)
-            setting_file_path = deault_setting_file_path
+            setting_file_path = default_setting_file_path
 
         os.chdir(path_to_src )
 

@@ -31,12 +31,12 @@ class RelaxedIK:
 
         setting_file_path = ""
         try: 
-            setting_file_path = rospy.get_param('~setting_file_path')
+            setting_file_path = rospy.get_param('setting_file_path')
         except:
             pass
 
         if setting_file_path == "":
-            print("Rviz viewer: no setting file path is given, using the default setting file -- {}".format(default_setting_file_path))
+            print("Relaxed IK Rust: no setting file path is given, using the default setting file -- {}".format(default_setting_file_path))
             setting_file_path = default_setting_file_path
 
         try: 
